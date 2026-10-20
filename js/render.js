@@ -9,7 +9,7 @@
     [T.WATER]: '#2a5d8f', [T.ROAD]: '#4a4a4f', [T.PATH]: '#7b7462', [T.ASPHALT]: '#55555a', [T.BRIDGE]: '#5a5a60',
     [T.WALL]: '#5e5248', [T.IWALL]: '#6b5f55', [T.FLOOR]: '#d2c6ad', [T.DOOR]: '#5e5248', [T.GRAVEL]: '#6e6a62',
     [T.WETLAND]: '#4e6b55', [T.SAND]: '#c8b98a', [T.SCRUB]: '#5c7a3f', [T.DOOR_OPEN]: '#5e5248', [T.DOOR_BROKEN]: '#5e5248',
-    [T.WINDOW]: '#5e5248', [T.WINDOW_BROKEN]: '#5e5248', [T.WALL_BROKEN]: '#d2c6ad', [T.RAIL]: '#5a534c', [T.CAR]: '#4a4a4f',
+    [T.WINDOW]: '#5e5248', [T.WINDOW_BROKEN]: '#5e5248', [T.WALL_BROKEN]: '#d2c6ad', [T.RAIL]: '#5a534c', [T.CAR]: '#4a4a4f', [T.OBJ]: '#d2c6ad',
   };
   const SNOWY = new Set([T.GRASS, T.LAWN, T.FOREST_FLOOR, T.FARM, T.SCRUB, T.WETLAND, T.SAND, T.GRAVEL, T.TREE]);
   const AREA_COLOR = { water: '#2a5d8f', forest: '#2f4d2a', scrub: '#5c7a3f', wetland: '#4e6b55', sand: '#c8b98a', farm: '#8a7a3a', grass: '#3f6b35', asphalt: '#55555a', gravel: '#6e6a62', lawn: '#4a7a3c' };
@@ -210,9 +210,13 @@
           if (f.rf === 'pitched' || f.rf === 'shed') {
             // Ridge along the long axis plus shingle lines perpendicular to it.
             const horiz = bw >= bh;
-            ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.12; ctx.beginPath();
-            if (horiz) for (let x = bx0; x <= bx1; x += 1.6) { ctx.moveTo(x, by0); ctx.lineTo(x, by1); }
-            else for (let y = by0; y <= by1; y += 1.6) { ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); }
+            ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 0.08; ctx.beginPath();
+            if (horiz) for (let x = bx0; x <= bx1; x += 0.7) { ctx.moveTo(x, by0); ctx.lineTo(x, by1); }
+            else for (let y = by0; y <= by1; y += 0.7) { ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); }
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.06; ctx.beginPath();
+            if (horiz) for (let y = by0; y <= by1; y += 0.5) { ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); }
+            else for (let x = bx0; x <= bx1; x += 0.5) { ctx.moveTo(x, by0); ctx.lineTo(x, by1); }
             ctx.stroke();
             if (f.rf === 'pitched') {
               ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 0.35; ctx.beginPath();
@@ -223,9 +227,9 @@
               ctx.fill();
             }
           } else {
-            ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.1; ctx.beginPath();
-            for (let x = bx0; x <= bx1; x += 3) { ctx.moveTo(x, by0); ctx.lineTo(x, by1); }
-            for (let y = by0; y <= by1; y += 3) { ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); }
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 0.07; ctx.beginPath();
+            for (let x = bx0; x <= bx1; x += 1.5) { ctx.moveTo(x, by0); ctx.lineTo(x, by1); }
+            for (let y = by0; y <= by1; y += 1.5) { ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); }
             ctx.stroke();
             ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.rect(bx0 + 0.6, by0 + 0.6, bw - 1.2, bh - 1.2); ctx.stroke();
           }
@@ -296,7 +300,7 @@
         if (c < 0 || r < 0 || c >= cols || r >= rows || !game.visible(z.x, z.y)) continue;
         SP.draw(ctx, z.alert ? 'zombie_alert' : 'zombie', c * ts, r * ts, ts);
       }
-      SP.draw(ctx, 'player', (px - ox) * ts, (py - oy) * ts, ts);
+      ctx.drawImage(SP.avatar(game.player.avatar), (px - ox) * ts, (py - oy) * ts, ts, ts);
 
       // 8. Shot tracer.
       const shot = game.lastShot;
@@ -368,15 +372,15 @@
         ctx.imageSmoothingEnabled = false;
       }
 
-      if (!world.inData(px, py)) { ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('You are beyond the mapped area. The wilderness here is generated.', 12, H - 14); }
+      if (!world.inData(px, py)) { ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('Past the edge of the map. The country out here is made up.', 12, H - 14); }
       this.drawSidebar(game);
     }
 
     drawSidebar(game) {
-      const p = game.player, w = game.weapon();
+      const p = game.player, w = game.weapon(), SP = global.Sprites;
       const bar = (v, color) => `<div class="bar"><div style="width:${v}%;background:${color}"></div></div>`;
       const b = game.world.buildingAt(p.x, p.y);
-      let where = 'Outside';
+      let where = 'Out in the open';
       if (b) where = (b.n ? b.n + ' · ' : '') + (USE_LABEL[b.u] || b.u);
       else {
         const near = nearestNamed(game, p.x, p.y);
@@ -390,22 +394,22 @@
         const wield = p.weapon === id && it.cat === 'weapon' ? ' <span class="muted">(wielded)</span>' : (it.ranged ? ` <span class="muted">(range ${it.range})</span>` : '');
         inv += `<div class="item cat-${it.cat}"><span class="key">${String.fromCharCode(97 + i)}</span> ${it.name}${wield}</div>`;
       });
-      if (!p.inv.length) inv = '<div class="muted">Empty pack</div>';
+      if (!p.inv.length) inv = '<div class="muted">Nothing in it</div>';
       const msgs = game.msgs.slice(-9).map((m, i, a) => `<div class="${i === a.length - 1 ? 'latest' : ''}">${escapeHtml(m.s)}</div>`).join('');
       this.sidebar.innerHTML = `
         <div class="place">${escapeHtml(game.place.name.split(',').slice(0, 2).join(','))}</div>
-        <div class="time">${escapeHtml(game.className())} · ${timeStr} · turn ${game.turn}</div>
+        <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr} · turn ${game.turn}</div>
         <div class="where">${escapeHtml(where)}</div>
-        <div class="stat"><span>HP</span>${bar(100 * p.hp / (p.hpMax || 100), p.hp > 40 ? '#5fbf6a' : '#d44')}<span class="num">${p.hp}</span></div>
+        <div class="stat"><span>Body</span>${bar(100 * p.hp / (p.hpMax || 100), p.hp > 40 ? '#5fbf6a' : '#d44')}<span class="num">${p.hp}</span></div>
         <div class="stat"><span>Food</span>${bar(p.hunger, p.hunger > 25 ? '#d9a441' : '#d44')}<span class="num">${p.hunger}</span></div>
         <div class="stat"><span>Water</span>${bar(p.thirst, p.thirst > 25 ? '#5a9bd8' : '#d44')}<span class="num">${p.thirst}</span></div>
-        <div class="weapon">Weapon: <b>${w.name}</b> <span class="muted">(dmg ${w.dmg}${w.ranged ? ', range ' + w.range + ', ' + (p.ammo[w.ammo] || 0) + ' ' + ITEMS[w.ammo].short : ''})</span> · Kills: ${p.kills}</div>
-        <div class="muted">Ammo: ${Object.entries(p.ammo || {}).filter(([, n]) => n > 0).map(([id, n]) => n + ' ' + ITEMS[id].short).join(' · ') || 'none'}</div>
-        <div class="section">Pack <span class="muted">(${p.inv.length}/16) — press a letter to use</span></div>
+        <div class="weapon">In hand: <b>${w.name}</b> <span class="muted">(dmg ${w.dmg}${w.ranged ? ', range ' + w.range + ', ' + (p.ammo[w.ammo] || 0) + ' ' + ITEMS[w.ammo].short : ''})</span> · Put down: ${p.kills}</div>
+        <div class="muted">Rounds: ${Object.entries(p.ammo || {}).filter(([, n]) => n > 0).map(([id, n]) => n + ' ' + ITEMS[id].short).join(' · ') || 'none'}</div>
+        <div class="section">Pack <span class="muted">(${p.inv.length}/16) · a letter uses it</span></div>
         <div class="inv">${inv}</div>
-        <div class="section">Log</div>
+        <div class="section">What happened</div>
         <div class="log">${msgs}</div>
-        <div class="help muted">move: arrows / numpad / hjklyubn · g search · F+dir fire · c+dir close door · . wait · d drop · m map · S save · ? help</div>`;
+        <div class="help muted">move: arrows / numpad / hjklyubn · g search beside you · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
     }
 
     drawMap(game) {
@@ -452,7 +456,7 @@
       let ly = 12;
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, 8, 190, 20 * 8 + 10);
       for (const [u, col] of Object.entries(USE_COLOR)) { ctx.fillStyle = col; ctx.fillRect(16, ly + 2, 12, 12); ctx.fillStyle = '#eee'; ctx.fillText(USE_LABEL[u], 36, ly); ly += 20; }
-      ctx.fillStyle = '#eee'; ctx.fillText('m or Esc to close', 16, ly + 2);
+      ctx.fillStyle = '#eee'; ctx.fillText('m or Esc. Back to the road.', 16, ly + 2);
       ctx.textAlign = 'center'; ctx.fillStyle = '#eee'; ctx.font = '15px sans-serif';
       ctx.fillText(game.place.name.split(',').slice(0, 3).join(', ') + ' — ' + Math.round(game.place.w * game.place.tileM / 1000 * 10) / 10 + ' × ' + Math.round(game.place.h * game.place.tileM / 1000 * 10) / 10 + ' km', W / 2, 10);
     }

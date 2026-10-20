@@ -55,19 +55,19 @@
   // Character classes: starting kit plus one or two perks. Perk keys are read by the rules below.
   const CLASSES = {
     soldier:     { name: 'Soldier',        hp: 110, weapon: 'pistol', items: ['pistol', 'knife', 'bandage', 'jerky'], ammo: { ammo9: 14 },
-                   perks: { melee: 1, ranged: 0.1 }, desc: 'Reservist from Petawawa. Pistol and 14 rounds. +1 melee damage, +10% ranged accuracy.' },
+                   perks: { melee: 1, ranged: 0.1 }, desc: 'Reservist out of Petawawa. A pistol and fourteen rounds. You hit harder and you shoot straighter. 110 body.' },
     police:      { name: 'Police Officer', hp: 100, weapon: 'pistol', items: ['pistol', 'bat', 'bandage', 'coffee'], ammo: { ammo9: 10 },
-                   perks: { ranged: 0.15, noiseDamp: 3 }, desc: 'Off-duty constable. Pistol and baton. +15% ranged accuracy, trained to shoot quietly and clean.' },
+                   perks: { ranged: 0.15, noiseDamp: 3 }, desc: 'Off-duty constable. Pistol and baton. You shoot straighter than most and you dont waste the noise.' },
     doctor:      { name: 'Doctor',         hp: 90,  weapon: 'knife',  items: ['knife', 'firstaid', 'firstaid', 'painkiller', 'bandage', 'bandage'], ammo: {},
-                   perks: { medMult: 1.5, regen: 2 }, desc: 'ER physician. Two first aid kits. Meds heal 50% more, and wounds close twice as fast.' },
+                   perks: { medMult: 1.5, regen: 2 }, desc: 'Emergency physician. Two kits. What you bind heals half again as well and twice as fast. 90 body.' },
     engineer:    { name: 'Engineer',       hp: 100, weapon: 'crowbar', items: ['crowbar', 'ducttape', 'rope', 'granola', 'water'], ammo: {},
-                   perks: { loot: 1 }, desc: 'Civil engineer. Crowbar and duct tape. Knows where things are kept: every container yields one extra item.' },
+                   perks: { loot: 1 }, desc: 'Civil engineer. Crowbar and tape. You know where people keep things. One thing more from every drawer.' },
     firefighter: { name: 'Firefighter',    hp: 130, weapon: 'axe',    items: ['axe', 'firstaid', 'water', 'water'], ammo: {},
-                   perks: { hpMax: 130 }, desc: 'Ottawa Fire. Fire axe and 130 HP. Hits hard, takes hits.' },
+                   perks: { hpMax: 130 }, desc: 'Ottawa Fire. An axe and 130 body. You hit hard and you take it.' },
     hunter:      { name: 'Hunter',         hp: 100, weapon: 'rifle',  items: ['rifle', 'knife', 'jerky', 'jerky', 'water'], ammo: { rifleammo: 10, arrow: 6 },
-                   perks: { stealth: 3, ranged: 0.05 }, desc: 'Valley deer hunter. Rifle, 10 rounds, 6 arrows for when you find a bow. Zombies notice you 3 tiles later.' },
+                   perks: { stealth: 3, ranged: 0.05 }, desc: 'Valley deer hunter. A rifle, ten rounds, six arrows against the day you find a bow. They see you three paces later than they should.' },
     chef:        { name: 'Chef',           hp: 100, weapon: 'knife',  items: ['knife', 'beans', 'soup', 'pb', 'water', 'coffee'], ammo: {},
-                   perks: { foodMult: 1.5 }, desc: 'Line cook on Elgin Street. Big knife and a full pantry. Food and drink restore 50% more.' },
+                   perks: { foodMult: 1.5 }, desc: 'Line cook off Elgin Street. A big knife and a full pantry. You make food go half again as far.' },
   };
 
   // Loot tables: [itemId, weight]; "nothing" is implicit via emptyChance.
@@ -115,7 +115,7 @@
       this.nextId = 1;
       this.dead = false;
       this.rng = mulberry32((this.seed ^ 0xA5A5A5A5) >>> 0);
-      this.player = { x: 0, y: 0, hp: 100, hpMax: 100, hunger: 100, thirst: 100, inv: [], ammo: {}, weapon: null, kills: 0, looted: 0, cls: null };
+      this.player = { x: 0, y: 0, hp: 100, hpMax: 100, hunger: 100, thirst: 100, inv: [], ammo: {}, weapon: null, kills: 0, looted: 0, cls: null, avatar: null };
       this.lastShot = null;
       this.doors = new Map(); // 'x,y' -> { t: tile state, hp } for doors/windows/walls that changed from their generated state
       this.lastHorde = 0;
@@ -126,8 +126,9 @@
     }
 
     // ---- setup ---------------------------------------------------------------
-    start(clsId) {
+    start(clsId, avatar) {
       const cls = CLASSES[clsId] || null;
+      this.player.avatar = Object.assign({ outfit: clsId && CLASSES[clsId] ? clsId : 'civ' }, avatar || {});
       if (cls) {
         const pl = this.player;
         pl.cls = clsId; pl.hpMax = cls.hp; pl.hp = cls.hp;
@@ -137,8 +138,8 @@
       this.player.x = p[0]; this.player.y = p[1];
       this.ensureSpawns();
       this.computeFov();
-      this.log('You wake up in ' + this.place.name.split(',')[0] + (cls ? ' as a ' + cls.name.toLowerCase() : '') + '. It is quiet. Too quiet.');
-      this.log('Find food, water and a weapon. Press ? for help.');
+      this.log('You wake in ' + this.place.name.split(',')[0] + '. Grey light. Nothing moves. You were ' + (cls ? 'a ' + cls.name.toLowerCase() : 'somebody') + ', once.');
+      this.log('Find food. Find water. Something to hold. Press ? if you need to know more.');
     }
 
     findStart() {
@@ -274,12 +275,12 @@
     }
     closeDoor(dx, dy) {
       const x = this.player.x + dx, y = this.player.y + dy, t = this.world.tileAt(x, y);
-      if (t === T.DOOR) { this.log('That door is already closed.'); return false; }
-      if (t === T.DOOR_BROKEN) { this.log('That door is in splinters. Nothing left to close.'); return false; }
-      if (t !== T.DOOR_OPEN) { this.log('No door there.'); return false; }
-      if (this.zombieAt(x, y)) { this.log('A zombie is standing in the doorway!'); return false; }
+      if (t === T.DOOR) { this.log('Its shut.'); return false; }
+      if (t === T.DOOR_BROKEN) { this.log('Its in splinters. Nothing left to shut.'); return false; }
+      if (t !== T.DOOR_OPEN) { this.log('No door.'); return false; }
+      if (this.zombieAt(x, y)) { this.log('One of them is in the doorway.'); return false; }
       this.setDoor(x, y, T.DOOR);
-      this.log('You pull the door shut.');
+      this.log('You pull the door to behind you.');
       return true;
     }
     // A zombie pounds on the barrier (closed door, window or wall) at (x,y). Returns true (its turn is spent).
@@ -292,16 +293,16 @@
       if (this.rng() < hitChance) {
         const hp = this.doorHp(x, y) - 1;
         if (hp <= 0) {
-          if (t === T.DOOR) { this.setDoor(x, y, T.DOOR_BROKEN, 0); if (near <= 14) this.log(near <= 6 ? 'The door bursts open in a shower of splinters!' : 'You hear a door give way somewhere close.'); }
-          else if (t === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); if (near <= 14) this.log(near <= 6 ? 'A window shatters inward!' : 'You hear glass breaking nearby.'); }
-          else { this.setDoor(x, y, T.WALL_BROKEN, 0); if (near <= 18) this.log(near <= 8 ? 'A section of wall collapses with a roar!' : 'You hear masonry come down somewhere close.'); }
+          if (t === T.DOOR) { this.setDoor(x, y, T.DOOR_BROKEN, 0); if (near <= 14) this.log(near <= 6 ? 'The door comes in.' : 'Somewhere close a door gives.'); }
+          else if (t === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); if (near <= 14) this.log(near <= 6 ? 'The window comes in with them behind it.' : 'Glass, somewhere close.'); }
+          else { this.setDoor(x, y, T.WALL_BROKEN, 0); if (near <= 18) this.log(near <= 8 ? 'The wall comes down.' : 'Somewhere close, a wall going.'); }
           return true;
         }
         this.setDoor(x, y, t, hp);
         if (near <= 12 && this.turn % 2 === 0) {
-          if (t === T.DOOR) this.log(near <= 5 ? 'Something pounds on the door' + (hp <= 3 ? '. The frame is cracking.' : '.') : 'You hear pounding on a door nearby.');
-          else if (t === T.WINDOW) this.log(near <= 5 ? 'Fists hammer on a window. The glass is cracking.' : 'You hear knocking on glass nearby.');
-          else if (this.turn % 6 === 0) this.log(near <= 5 ? 'The wall shudders under a dull, relentless thudding.' + (hp <= 15 ? ' Dust sifts from the cracks.' : '') : 'You hear a heavy, rhythmic thudding against a wall.');
+          if (t === T.DOOR) this.log(near <= 5 ? 'Something at the door. Pounding.' + (hp <= 3 ? ' The frame is going.' : '') : 'Pounding on a door, not far.');
+          else if (t === T.WINDOW) this.log(near <= 5 ? 'Hands on the glass. It wont hold.' : 'Knocking on glass, not far.');
+          else if (this.turn % 6 === 0) this.log(near <= 5 ? 'The wall shudders. A dull thudding that doesnt stop.' + (hp <= 15 ? ' Dust sifts down.' : '') : 'A heavy thudding against a wall somewhere.');
         }
       }
       return true;
@@ -328,7 +329,7 @@
         const r = this.rng(), prev = w.k;
         w.k = r < 0.38 ? 'clear' : r < 0.62 ? 'overcast' : r < 0.78 ? 'rain' : r < 0.86 ? 'fog' : 'snow';
         w.until = this.turn + 400 + Math.floor(this.rng() * 1400);
-        if (w.k !== prev) this.log({ clear: 'The sky clears.', overcast: 'Clouds roll in, flat and grey.', rain: 'Rain begins to fall.', fog: 'A fog creeps in off the river.', snow: 'Snow starts to fall.' }[w.k]);
+        if (w.k !== prev) this.log({ clear: 'The sky clears. It doesnt help.', overcast: 'The sky goes the colour of ash.', rain: 'Rain. Cold and steady.', fog: 'Fog comes up off the river and takes the far houses.', snow: 'Snow. It comes down grey.' }[w.k]);
       }
       if (w.k === 'snow') this.snow = Math.min(1, this.snow + 1 / 300);
       else if (w.k === 'rain') this.snow = Math.max(0, this.snow - 1 / 200);
@@ -360,7 +361,7 @@
       this.lastHorde = this.turn;
       const dirs = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
       const dir = dirs[Math.round(((ang + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
-      this.log('A groaning chorus rises from the ' + dir + '. A horde is coming.');
+      this.log('A sound from the ' + dir + ' like wind in a culvert. Many of them. Coming.');
     }
 
     // ---- player actions ------------------------------------------------------
@@ -370,7 +371,7 @@
       let took = false;
       switch (cmd) {
         case 'move': took = this.tryMove(arg[0], arg[1]); break;
-        case 'wait': took = true; this.log('You wait.'); break;
+        case 'wait': took = true; this.log('You wait. Nothing comes.'); break;
         case 'grab': took = this.grab(); break;
         case 'use': took = this.useItem(arg); break;
         case 'drop': took = this.dropItem(arg); break;
@@ -387,17 +388,16 @@
       const z = this.zombieAt(x, y);
       if (z) { this.attack(z); return true; }
       const bt = this.world.tileAt(x, y);
-      if (bt === T.DOOR) { this.setDoor(x, y, T.DOOR_OPEN); this.log('You open the door.'); return true; }
-      if (bt === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); this.noise(x, y, 8); this.log('You smash the window. The noise carries.'); return true; }
+      if (bt === T.DOOR) { this.setDoor(x, y, T.DOOR_OPEN); this.log('The door gives. You go in.'); return true; }
+      if (bt === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); this.noise(x, y, 8); this.log('The glass goes. The sound carries a long way in the quiet.'); return true; }
       if (bt === T.CAR) { const car = this.world.carAt(x, y); if (car) return this.searchContainer(car); }
+      if (bt === T.OBJ) { const c = this.world.containerAt(x, y); if (c) return this.searchContainer(c); }
       if (!this.world.passable(x, y) || this.cornerBlocked(this.player.x, this.player.y, dx, dy)) {
         const t = this.world.tileAt(x, y);
-        if (t === T.WATER) this.log('The water is too deep and far too cold.');
+        if (t === T.WATER) this.log('Black water. You dont go in.');
         return false;
       }
       this.player.x = x; this.player.y = y;
-      const c = this.world.containerAt(x, y);
-      if (c) this.log('There is a' + (/^[aeiou]/.test(CONTAINER_NAME[c.kind]) ? 'n ' : ' ') + CONTAINER_NAME[c.kind] + ' here' + (c.opened ? ' (empty).' : '. Press g to search it.'));
       return true;
     }
 
@@ -411,17 +411,17 @@
         if (z.hp <= 0) {
           this.zombies.splice(this.zombies.indexOf(z), 1); this.zmap.delete(z.x + ',' + z.y);
           this.player.kills++;
-          this.log('You put the zombie down with the ' + w.name.toLowerCase() + '.');
-        } else this.log('You hit the zombie with the ' + w.name.toLowerCase() + ' for ' + dmg + '.');
-      } else this.log('You swing and miss.');
+          this.log('It goes down and doesnt get up. The ' + w.name.toLowerCase() + '.');
+        } else this.log('The ' + w.name.toLowerCase() + ' lands. ' + dmg + '.');
+      } else this.log('You swing at it. Air.');
     }
 
     // Fire the wielded ranged weapon along a straight line (8 directions). Returns true if a turn passed.
     fire(dx, dy) {
       const w = this.weapon();
-      if (!w.ranged) { this.log('You need to wield a ranged weapon first (bow, pistol, shotgun, rifle).'); return false; }
+      if (!w.ranged) { this.log('Nothing in your hands that will reach that far.'); return false; }
       const have = this.player.ammo[w.ammo] || 0;
-      if (have <= 0) { this.log('No ' + ITEMS[w.ammo].short + ' left for the ' + w.name.toLowerCase() + '.'); return false; }
+      if (have <= 0) { this.log('No ' + ITEMS[w.ammo].short + '. You check again anyway.'); return false; }
       this.player.ammo[w.ammo] = have - 1;
       let x = this.player.x, y = this.player.y, target = null, dist = 0;
       for (let i = 1; i <= w.range; i++) {
@@ -434,7 +434,7 @@
       }
       this.lastShot = { x0: this.player.x, y0: this.player.y, x1: x, y1: y, turn: this.turn + 1, hit: !!target };
       this.noise(this.player.x, this.player.y, Math.max(2, w.noise - this.perk('noiseDamp', 0)));
-      if (!target) { this.log('You fire the ' + w.name.toLowerCase() + '. Nothing there.'); return true; }
+      if (!target) { this.log('The shot goes out across the lots. Nothing.'); return true; }
       const hitChance = Math.min(0.97, Math.max(0.3, w.hit + this.perk('ranged', 0) - (w.falloff || 0.025) * dist));
       if (this.rng() < hitChance) {
         const dmg = w.dmg + (this.rng() < 0.25 ? 1 : 0);
@@ -442,31 +442,36 @@
         if (target.hp <= 0) {
           this.zombies.splice(this.zombies.indexOf(target), 1); this.zmap.delete(target.x + ',' + target.y);
           this.player.kills++;
-          this.log('Your ' + w.name.toLowerCase() + ' drops the zombie at ' + dist + ' tiles.');
-        } else this.log('You hit the zombie for ' + dmg + ' at ' + dist + ' tiles.');
-      } else this.log('You fire the ' + w.name.toLowerCase() + ' and miss.');
+          this.log('It drops at ' + dist + ' paces and lies there.');
+        } else this.log('Hit, at ' + dist + ' paces. ' + dmg + '. It keeps coming.');
+      } else this.log('The shot goes wide.');
       return true;
     }
 
+    // g: go through the nearest unsearched container or car beside you (walking into one does the same).
     grab() {
-      const c = this.world.containerAt(this.player.x, this.player.y);
-      if (!c) { this.log('Nothing to search here. Walk into a car to search it.'); return false; }
-      return this.searchContainer(c);
+      const p = this.player; let best = null;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        const c = this.world.containerAt(p.x + dx, p.y + dy) || this.world.carAt(p.x + dx, p.y + dy);
+        if (c && (!best || (best.opened && !c.opened))) best = c;
+      }
+      if (!best) { this.log('Nothing here to go through.'); return false; }
+      return this.searchContainer(best);
     }
     searchContainer(c) {
-      if (c.opened) { this.log('The ' + CONTAINER_NAME[c.kind] + ' is already picked clean.'); return false; }
+      if (c.opened) { this.log('Youve been through this already.'); return false; }
       if (c.items === null) c.items = this.rollLoot(c);
       c.opened = true;
       this.player.looted++;
-      if (!c.items.length) { this.log('The ' + CONTAINER_NAME[c.kind] + ' is empty.'); return true; }
+      if (!c.items.length) { this.log('Nothing. Someone was here before you.'); return true; }
       const got = [], left = [];
       for (const entry of c.items) {
         const [id, qty] = entry.split('*');
         if (ITEMS[id].cat === 'ammo') { const n = parseInt(qty || '1', 10); this.player.ammo[id] = (this.player.ammo[id] || 0) + n; got.push(n + ' ' + ITEMS[id].short); continue; }
         if (this.player.inv.length >= INV_MAX) left.push(entry); else { this.player.inv.push(id); got.push(ITEMS[id].name); }
       }
-      if (got.length) this.log('You find: ' + got.join(', ') + '.');
-      if (left.length) { this.log('Your pack is full; you leave ' + left.map(i => ITEMS[i.split('*')[0]].name).join(', ') + '.'); c.items = left; c.opened = false; }
+      if (got.length) this.log('In the ' + CONTAINER_NAME[c.kind] + ': ' + got.join(', ').toLowerCase() + '. You take ' + (got.length > 1 ? 'them' : 'it') + '.');
+      if (left.length) { this.log('The pack wont take any more. You leave ' + left.map(i => ITEMS[i.split('*')[0]].name.toLowerCase()).join(', ') + '.'); c.items = left; c.opened = false; }
       else c.items = [];
       return true;
     }
@@ -500,19 +505,19 @@
           p.hunger = Math.max(0, Math.min(100, p.hunger + Math.round((it.hunger || 0) * ((it.hunger || 0) > 0 ? fm : 1))));
           p.thirst = Math.max(0, Math.min(100, p.thirst + Math.round((it.thirst || 0) * ((it.thirst || 0) > 0 ? fm : 1))));
           p.inv.splice(idx, 1);
-          this.log((it.cat === 'food' ? 'You eat the ' : 'You drink the ') + it.name.toLowerCase() + '.');
+          this.log(it.cat === 'food' ? 'You eat the ' + it.name.toLowerCase() + ' cold, standing up.' : 'You drink the ' + it.name.toLowerCase() + '. It helps.');
           return true;
         case 'med':
-          if (p.hp >= p.hpMax) { this.log('You are not hurt.'); return false; }
+          if (p.hp >= p.hpMax) { this.log('Youre not hurt. Not that way.'); return false; }
           p.hp = Math.min(p.hpMax, p.hp + Math.round(it.heal * this.perk('medMult', 1))); p.inv.splice(idx, 1);
-          this.log('You use the ' + it.name.toLowerCase() + '. HP ' + p.hp + '.');
+          this.log('You bind it as best you can. ' + p.hp + '.');
           return true;
         case 'weapon':
-          if (p.weapon === id) { this.log('Already wielding it.'); return false; }
-          p.weapon = id; this.log('You wield the ' + it.name.toLowerCase() + '.');
+          if (p.weapon === id) { this.log('Its already in your hand.'); return false; }
+          p.weapon = id; this.log('You take up the ' + it.name.toLowerCase() + '.');
           return true;
         default:
-          this.log(it.name + ': ' + (it.note || 'Not usable yet.'));
+          this.log(it.name + '. ' + (it.note || 'No use for it yet.'));
           return false;
       }
     }
@@ -521,7 +526,7 @@
       const id = this.player.inv[idx]; if (!id) return false;
       this.player.inv.splice(idx, 1);
       if (this.player.weapon === id && !this.player.inv.includes(id)) this.player.weapon = null;
-      this.log('You drop the ' + ITEMS[id].name.toLowerCase() + '.');
+      this.log('You leave the ' + ITEMS[id].name.toLowerCase() + ' in the road.');
       return true;
     }
 
@@ -537,17 +542,17 @@
       const p = this.player;
       if (this.turn % 90 === 0) p.hunger = Math.max(0, p.hunger - 1);
       if (this.turn % 55 === 0) p.thirst = Math.max(0, p.thirst - 1);
-      if (p.hunger === 0 && this.turn % 20 === 0) { p.hp -= 1; if (this.turn % 100 === 0) this.log('You are starving.'); }
-      if (p.thirst === 0 && this.turn % 12 === 0) { p.hp -= 1; if (this.turn % 60 === 0) this.log('You are dying of thirst.'); }
-      if (p.hunger === 25 && this.turn % 90 === 0) this.log('Your stomach growls.');
-      if (p.thirst === 25 && this.turn % 55 === 0) this.log('Your mouth is dry.');
+      if (p.hunger === 0 && this.turn % 20 === 0) { p.hp -= 1; if (this.turn % 100 === 0) this.log('You are starving. You know it the way you know the cold.'); }
+      if (p.thirst === 0 && this.turn % 12 === 0) { p.hp -= 1; if (this.turn % 60 === 0) this.log('There is no water. Your body keeps telling you.'); }
+      if (p.hunger === 25 && this.turn % 90 === 0) this.log('The hunger is a stone in you.');
+      if (p.thirst === 25 && this.turn % 55 === 0) this.log('Your mouth is ash.');
       if (p.hp > 0 && p.hp < p.hpMax && p.hunger > 50 && p.thirst > 50 && this.turn % Math.round(40 / this.perk('regen', 1)) === 0) p.hp++;
       this.updateWeather();
       this.ensureSpawns();
       this.maybeSpawnHorde();
       this.zombiesAct();
       this.computeFov();
-      if (p.hp <= 0) { p.hp = 0; this.dead = true; this.log('You have died.'); }
+      if (p.hp <= 0) { p.hp = 0; this.dead = true; this.log('Then nothing.'); }
     }
 
     zombiesAct() {
@@ -632,8 +637,8 @@
       if (this.rng() < 0.65) {
         const dmg = 3 + Math.floor(this.rng() * 6);
         this.player.hp -= dmg;
-        this.log('The zombie bites you for ' + dmg + '!');
-      } else this.log('The zombie lunges and misses.');
+        this.log('It gets its teeth in you. ' + dmg + '.');
+      } else this.log('It comes at you and finds nothing.');
     }
 
     // ---- save / load -----------------------------------------------------------
@@ -659,7 +664,7 @@
       for (const [x, y, t, hp] of data.doors || []) g.setDoor(x, y, t, hp);
       for (const k in data.seen) { const [cx, cy] = k.split(',').map(Number); unrle(data.seen[k], g.world.getChunk(cx, cy).seen); }
       g.computeFov();
-      g.log('Game loaded.');
+      g.log('You pick it up where you left it.');
       return g;
     }
   }

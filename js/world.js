@@ -7,11 +7,11 @@
   const T = {
     GRASS: 0, TREE: 1, FARM: 2, WATER: 3, ROAD: 4, PATH: 5, ASPHALT: 6, WALL: 7, FLOOR: 8, DOOR: 9,
     GRAVEL: 10, WETLAND: 11, SAND: 12, SCRUB: 13, LAWN: 14, IWALL: 15, FOREST_FLOOR: 16, BRIDGE: 17,
-    DOOR_OPEN: 18, DOOR_BROKEN: 19, WINDOW: 20, WINDOW_BROKEN: 21, WALL_BROKEN: 22, RAIL: 23, CAR: 24,
+    DOOR_OPEN: 18, DOOR_BROKEN: 19, WINDOW: 20, WINDOW_BROKEN: 21, WALL_BROKEN: 22, RAIL: 23, CAR: 24, OBJ: 25,
   };
   // DOOR is a closed door: it blocks movement and sight until opened (player) or broken down (zombies).
   // WINDOW blocks movement but not sight; once broken it is a way in. WALL_BROKEN is a hole a horde made.
-  const BLOCKS_MOVE = new Set([T.TREE, T.WATER, T.WALL, T.IWALL, T.DOOR, T.WINDOW, T.CAR]);
+  const BLOCKS_MOVE = new Set([T.TREE, T.WATER, T.WALL, T.IWALL, T.DOOR, T.WINDOW, T.CAR, T.OBJ]); // OBJ: a container; bump it to search
   const BLOCKS_SIGHT = new Set([T.WALL, T.DOOR]); // only exterior walls and closed doors block sight: no shadows inside buildings
   const AREA_TILE = { water: T.WATER, forest: T.TREE, scrub: T.SCRUB, wetland: T.WETLAND, sand: T.SAND, farm: T.FARM,
     grass: T.GRASS, asphalt: T.ASPHALT, gravel: T.GRAVEL, lawn: T.LAWN };
@@ -278,6 +278,7 @@
         for (const c of lay.containers) {
           if (c.x < x0 || c.y < y0 || c.x >= x0 + CH || c.y >= y0 + CH) continue;
           if (tiles[(c.y - y0) * CH + (c.x - x0)] !== T.FLOOR) continue;
+          set(c.x, c.y, T.OBJ);
           containers.push({ x: c.x, y: c.y, kind: c.kind, use: c.use, items: null, opened: false, bld: i });
         }
       }
@@ -519,9 +520,12 @@
           cells.get(x + ',' + (y + 1)) === T.IWALL || cells.get(x + ',' + (y - 1)) === T.IWALL;
         if (nearWall) spots.push([x, y]);
       }
+      const taken = new Set();
       for (let n = 0; n < want && spots.length; n++) {
         const idx = Math.floor(rng() * spots.length);
         const [x, y] = spots.splice(idx, 1)[0];
+        if (taken.has((x + 1) + ',' + y) || taken.has((x - 1) + ',' + y) || taken.has(x + ',' + (y + 1)) || taken.has(x + ',' + (y - 1))) continue;
+        taken.add(x + ',' + y);
         containers.push({ x, y, kind: kinds[Math.floor(rng() * kinds.length)], use: f.u });
       }
 

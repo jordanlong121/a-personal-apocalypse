@@ -46,11 +46,21 @@
   .help { margin-top: auto; }
   #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
   #overlay.on { display: flex; }
-  #overlay .box { background: #15171d; border: 1px solid #3a3d47; border-radius: 8px; padding: 24px 28px; max-width: 720px; line-height: 1.5; max-height: 92%; overflow: auto; }
+  #overlay .box { background: #15171d; border: 1px solid #3a3d47; border-radius: 8px; padding: 24px 28px; max-width: 760px; line-height: 1.5; max-height: 92%; overflow: auto; }
   .cls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .cls { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; line-height: 1.35; }
   .cls b { color: #e8dcc2; } .cls span { color: #a9a496; font-size: 13px; }
   .cls:hover { border-color: #8a5a3a; }
+  .av-row { display: flex; gap: 16px; }
+  .av-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex: 1; align-content: start; }
+  .av-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; }
+  .av-preset img { width: 48px; height: 48px; image-rendering: pixelated; }
+  .av-preset span { font-size: 10px; color: #a9a496; line-height: 1.2; text-align: center; }
+  .av-custom { width: 230px; display: flex; flex-direction: column; gap: 6px; }
+  .av-custom label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: #a9a496; }
+  .av-custom select { width: 130px; padding: 4px 6px; }
+  #av-preview { width: 96px; height: 96px; image-rendering: pixelated; align-self: center; background: #3f6b35; border-radius: 6px; }
+  #side .avatar { width: 20px; height: 20px; image-rendering: pixelated; vertical-align: middle; margin-right: 2px; }
   #overlay h2 { margin: 0 0 10px; font-family: Georgia, serif; color: #e8dcc2; }
   #overlay kbd { background: #23262e; padding: 1px 6px; border-radius: 3px; font-family: monospace; }
   #topbar { position: absolute; top: 8px; left: 10px; display: flex; gap: 6px; }
@@ -60,29 +70,29 @@
 <body>
   <div id="title">
     <h1>A PERSONAL APOCALYPSE</h1>
-    <div class="sub">A roguelike built from real map data. Type any town or neighbourhood; the game downloads it once and plays offline after that.</div>
+    <div class="sub">Any town. The map is real. The rest is what came after. Type a place. It comes down once and then it is yours, with or without the net.</div>
     <div class="row">
-      <input id="q" placeholder="e.g. Carleton Place, Ontario — or Westboro, Ottawa" autocomplete="off">
+      <input id="q" placeholder="A town. Carleton Place, Ontario. Westboro, Ottawa." autocomplete="off">
       <select id="radius">
-        <option value="1000">2 × 2 km (fast)</option>
-        <option value="1500" selected>3 × 3 km</option>
-        <option value="2500">5 × 5 km (large, slow)</option>
+        <option value="1000">2 × 2 km. Quick.</option>
+        <option value="1500" selected>3 × 3 km.</option>
+        <option value="2500">5 × 5 km. Slow.</option>
       </select>
-      <button id="go" class="primary">Download &amp; play</button>
+      <button id="go" class="primary">Go there</button>
     </div>
     <div id="status"></div>
-    <div class="section" style="color:#e8dcc2;font-weight:600;margin-bottom:8px">Your places</div>
+    <div class="section" style="color:#e8dcc2;font-weight:600;margin-bottom:8px">Places</div>
     <div id="places" class="places"></div>
     <div class="note">
-      Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, ODbL. Downloads use the public Nominatim and Overpass services, which are run by volunteers; please be gentle with the large option.
-      Everything is generated from building footprints, road networks and land use: interiors, loot and zombies are procedural and seeded, so a place plays the same way every time at the same seed.
+      The maps are © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, ODbL. They come down through Nominatim and Overpass, which volunteers keep running. Go easy on the big one.
+      The streets and the walls are real. What is behind the walls, and what walks the streets, is made up, and made up the same way every time.
     </div>
   </div>
 
   <div id="game">
     <div id="view">
       <canvas id="canvas"></canvas>
-      <div id="topbar"><button id="btn-map">Map (m)</button><button id="btn-save">Save (S)</button><button id="btn-quit">Quit to title</button></div>
+      <div id="topbar"><button id="btn-map">Map (m)</button><button id="btn-save">Write it down (S)</button><button id="btn-quit">Leave</button></div>
       <div id="overlay"><div class="box" id="overlay-box"></div></div>
     </div>
     <div id="side"></div>

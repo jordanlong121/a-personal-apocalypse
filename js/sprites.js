@@ -662,5 +662,86 @@
     },
   };
 
+  // ---- Avatars: the player sprite composed from layers ---------------------------------------------
+  const SKIN = ['#f3dcc4', '#e8b894', '#d29a6b', '#b87a4b', '#8d5a33', '#5c3a22'];
+  const HAIR_COLORS = ['#1b1b1f', '#3a2a1e', '#6b4423', '#c99a4a', '#b5451b', '#8a8a8a', '#f0ece0'];
+  const CLOTH_COLORS = ['#4f6b3a', '#3f6fb5', '#c43a2e', '#6a4c93', '#2a2a2a', '#d9b24a', '#2a8a7a', '#e07a2a'];
+  const BODY = [
+    '............', '............', '...nnnnnn...', '...nknnkn...', '....nnNn....', '....nnnn....',
+    '............', '............', '............', '...pp..pp...', '...pp..pp...', '...kk..kk...',
+  ];
+  const OUTFITS = {
+    civ:         { name: 'Hoodie',          rows: ['..oooooooo..', '.noooOOooon.', '..oooooooo..', '..oOooooOo..'] },
+    soldier:     { name: 'Combat fatigues', rows: ['..jJjjjjJj..', '.njjBjjBjjn.', '..JjjjjjjJ..', '..jjBjjjjj..'] },
+    police:      { name: 'Police uniform',  rows: ['..UUUUUUUU..', '.nUUyUUUUUn.', '..UUUUUUUU..', '..UkkkkkkU..'] },
+    doctor:      { name: 'White coat',      rows: ['..wwiiiiww..', '.nwwiiiiwwn.', '..wwiiiiww..', '..wwwwwwww..'] },
+    engineer:    { name: 'Hi-vis vest',     rows: ['..yyyyyyyy..', '.nyywwwwyyn.', '..yyyyyyyy..', '..yywwwwyy..'] },
+    firefighter: { name: 'Turnout gear',    rows: ['..mmmmmmmm..', '.nmyyyyyymn.', '..mmmmmmmm..', '..myyyyyym..'] },
+    hunter:      { name: 'Blaze vest',      rows: ['..rRooooRr..', '.nrRooooRrn.', '..rRooooRr..', '..RrooooRr..'] },
+    chef:        { name: 'Chef whites',     rows: ['..wwwwwwww..', '.nwwwkwwwwn.', '..wwwwkwww..', '..wwwwwwww..'] },
+  };
+  const HAIR = {
+    short:    { name: 'Short',    rows: ['............', '....hhhh....', '...hhhhhh...', '...h....h...'] },
+    buzz:     { name: 'Buzz cut', rows: ['............', '....hhhh....', '...h....h...'] },
+    bald:     { name: 'Bald',     rows: [] },
+    long:     { name: 'Long',     rows: ['....hhhh....', '...hhhhhh...', '..hhhhhhhh..', '..hh....hh..', '..hh....hh..', '..hh....hh..', '..h......h..'] },
+    ponytail: { name: 'Ponytail', rows: ['............', '....hhhh....', '...hhhhhh...', '...h....hh..', '.........hh.', '.........hh.', '..........h.'] },
+    bun:      { name: 'Bun',      rows: ['.....hh.....', '....hhhh....', '...hhhhhh...', '...h....h...'] },
+    curly:    { name: 'Curly',    rows: ['...hhhhhh...', '..hhhhhhhh..', '..hhhhhhhh..', '..hh....hh..', '..hh....hh..'] },
+    braids:   { name: 'Braids',   rows: ['............', '....hhhh....', '...hhhhhh...', '..hh....hh..', '..h......h..', '..h......h..', '..h......h..', '..h......h..'] },
+    mohawk:   { name: 'Mohawk',   rows: ['.....hh.....', '.....hh.....', '....hhhh....'] },
+  };
+  const BEARD = ['............', '............', '............', '............', '...h.hh.h...', '....hhhh....'];
+  const ACC = {
+    none:    { name: 'None', rows: [] },
+    glasses: { name: 'Sunglasses', rows: ['............', '............', '............', '...kkkkkk...'] },
+    toque:   { name: 'Toque', rows: ['.....ww.....', '....cccc....', '...cccccc...', '...cwwwwc...'] },
+    cap:     { name: 'Ball cap', rows: ['............', '....cccc....', '...cccccccc.'] },
+    hijab:   { name: 'Hijab', rows: ['....cccc....', '...cccccc...', '..cc....cc..', '..cc....cc..', '..ccc..ccc..', '..cccccccc..', '.cc......cc.'] },
+  };
+  function shade(hex, f) { const v = parseInt(hex.slice(1), 16); const r = Math.round(((v >> 16) & 255) * f), g = Math.round(((v >> 8) & 255) * f), b = Math.round((v & 255) * f); return 'rgb(' + r + ',' + g + ',' + b + ')'; }
+  const avatarCache = new Map();
+  const DEFAULT_AVATAR = { skin: 1, hair: 'short', hairColor: 1, beard: false, acc: 'none', outfit: 'civ', cloth: 0 };
+  function paintRows(ctx, rows, map) {
+    rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const ch = row[x]; if (ch === '.' || ch === ' ') continue; ctx.fillStyle = map[ch] || BASE[ch] || '#f0f'; ctx.fillRect(x, y, 1, 1); } });
+  }
+  Sprites.avatarOptions = { SKIN, HAIR_COLORS, CLOTH_COLORS, OUTFITS, HAIR, ACC, DEFAULT_AVATAR };
+  // Returns a 12x12 canvas for an avatar spec {skin, hair, hairColor, beard, acc, outfit, cloth}.
+  Sprites.avatar = function (spec) {
+    spec = Object.assign({}, DEFAULT_AVATAR, spec || {});
+    const key = JSON.stringify(spec);
+    let cv = avatarCache.get(key);
+    if (cv) return cv;
+    cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d');
+    const skin = SKIN[spec.skin % SKIN.length], hair = HAIR_COLORS[spec.hairColor % HAIR_COLORS.length], cloth = CLOTH_COLORS[spec.cloth % CLOTH_COLORS.length];
+    const map = { n: skin, N: shade(skin, 0.8), h: hair, H: shade(hair, 0.8), o: cloth, O: shade(cloth, 0.75), c: cloth };
+    paintRows(ctx, BODY, map);
+    const outfit = OUTFITS[spec.outfit] || OUTFITS.civ;
+    ctx.save(); ctx.translate(0, 5); paintRows(ctx, outfit.rows, map); ctx.restore();
+    if (spec.acc !== 'hijab') paintRows(ctx, (HAIR[spec.hair] || HAIR.short).rows, map);
+    if (spec.beard) paintRows(ctx, BEARD, map);
+    paintRows(ctx, (ACC[spec.acc] || ACC.none).rows, map);
+    avatarCache.set(key, cv);
+    return cv;
+  };
+  Sprites.avatarDataUrl = function (spec) { return Sprites.avatar(spec).toDataURL(); };
+  Sprites.PRESETS = [
+    { name: 'Short dark hair, medium skin',        spec: { skin: 2, hair: 'short', hairColor: 0 } },
+    { name: 'Long blond hair, light skin',          spec: { skin: 0, hair: 'long', hairColor: 3 } },
+    { name: 'Braids, dark skin',                    spec: { skin: 4, hair: 'braids', hairColor: 0 } },
+    { name: 'Curly hair and beard, deep skin',      spec: { skin: 5, hair: 'curly', hairColor: 0, beard: true } },
+    { name: 'Red ponytail, light skin, sunglasses', spec: { skin: 0, hair: 'ponytail', hairColor: 4, acc: 'glasses' } },
+    { name: 'Black bun, tan skin',                  spec: { skin: 3, hair: 'bun', hairColor: 0 } },
+    { name: 'Teal hijab, medium skin',              spec: { skin: 2, hair: 'bald', acc: 'hijab', cloth: 6 } },
+    { name: 'Grey buzz cut and beard, light skin',  spec: { skin: 1, hair: 'buzz', hairColor: 5, beard: true } },
+    { name: 'Black mohawk, brown skin',             spec: { skin: 3, hair: 'mohawk', hairColor: 0 } },
+    { name: 'Red toque, brown hair, light skin',    spec: { skin: 1, hair: 'short', hairColor: 2, acc: 'toque', cloth: 2 } },
+    { name: 'Ball cap and beard, dark skin',        spec: { skin: 4, hair: 'buzz', hairColor: 0, beard: true, acc: 'cap', cloth: 1 } },
+    { name: 'Bald, deep skin',                      spec: { skin: 5, hair: 'bald', hairColor: 0 } },
+    { name: 'White long hair, light skin',          spec: { skin: 0, hair: 'long', hairColor: 6 } },
+    { name: 'Brown curly hair, medium skin',        spec: { skin: 2, hair: 'curly', hairColor: 2 } },
+  ];
+
   global.Sprites = Sprites;
 })(typeof window !== 'undefined' ? window : globalThis);
