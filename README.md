@@ -34,7 +34,7 @@ All on-screen text is written flat and spare, after Cormac McCarthy's The Road.
 - Doors start closed: walk into one to open it, `c` + direction closes it. Alert zombies pound on closed doors for many turns before they break through.
 - Windows: walk into one to smash it and climb through. Hordes roam in occasionally and will batter down doors, windows and eventually walls.
 - `d` + letter drops. `.` waits. `m` overview map. `S` saves. `Esc` quits to the title (autosaves).
-- Food and water drain over time. At night zombies notice you from less far away.
+- Food and water drain over time. Below a quarter of your health you stagger: 25% of steps go astray at a quarter, 90% at a tenth. At night zombies notice you from less far away.
 - Permadeath: dying erases the save for that place.
 
 ## How a place becomes a world

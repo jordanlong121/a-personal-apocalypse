@@ -383,7 +383,18 @@
       return took;
     }
 
+    // Below a quarter of your body you stagger: a growing share of your steps go wherever your legs take them.
+    staggerChance() {
+      const pct = 100 * this.player.hp / (this.player.hpMax || 100);
+      if (pct > 25) return 0;
+      return Math.min(1, 0.25 + (25 - pct) * (0.65 / 15)); // 25% at a quarter, 90% at a tenth, worse below
+    }
     tryMove(dx, dy) {
+      const sc = this.staggerChance();
+      if (sc > 0 && (dx || dy) && this.rng() < sc) {
+        const d = DIRS[[1, 2, 3, 4, 6, 7, 8, 9][Math.floor(this.rng() * 8)]];
+        if (d[0] !== dx || d[1] !== dy) { dx = d[0]; dy = d[1]; if (this.rng() < 0.5) this.log(['You stagger.', 'Your legs go their own way.', 'The ground tilts and you go with it.', 'You cant make your feet do it.'][Math.floor(this.rng() * 4)]); }
+      }
       const x = this.player.x + dx, y = this.player.y + dy;
       const z = this.zombieAt(x, y);
       if (z) { this.attack(z); return true; }
@@ -552,6 +563,9 @@
       this.maybeSpawnHorde();
       this.zombiesAct();
       this.computeFov();
+      const low = 100 * p.hp / (p.hpMax || 100) <= 25;
+      if (low && !this.wasLow && p.hp > 0) this.log('You are losing too much blood. Your legs are not yours anymore.');
+      this.wasLow = low;
       if (p.hp <= 0) { p.hp = 0; this.dead = true; this.log('Then nothing.'); }
     }
 

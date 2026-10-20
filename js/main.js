@@ -187,7 +187,7 @@
       <div>Now and then they come in numbers. You will hear it first. They come straight on and they will take a door, a window, and in time a wall.</div>
       <div><kbd>F</kbd> and a direction fires what is in your hands, in a line. The bow reaches 8 and is quiet. Shotgun 6. Pistol 10. Rifle 16. Guns carry. Rounds go in a pouch and dont take pack room.</div>
       <div><kbd>.</kbd> or <kbd>space</kbd> waits. <kbd>m</kbd> is the map. <kbd>S</kbd> writes it down. <kbd>Esc</kbd> goes back to the title and writes it down on the way.</div>
-      <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
+      <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. Under a quarter of it you stagger, and the lower it goes the less your steps are your own. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
       <div class="muted">On the map. Gold is food. Red is medicine. Blue is tools. Purple is guns. Orange is gas.</div>
       <div class="muted" style="margin-top:10px">Any key.</div>`;
     overlay.classList.add('on');
