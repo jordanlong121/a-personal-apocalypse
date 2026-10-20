@@ -353,6 +353,17 @@
         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       }
 
+      // 10b. Red flash when you have just been hurt, fading out over a third of a second.
+      const hurtAge = game.hurtTime ? Date.now() - game.hurtTime : Infinity;
+      if (hurtAge < 350) {
+        const k = 1 - hurtAge / 350, strength = Math.min(1, 0.5 + (game.hurtAmount || 1) / 12);
+        ctx.fillStyle = 'rgba(200,20,20,' + (0.22 * k * strength) + ')'; ctx.fillRect(0, 0, W, H);
+        const rg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.7);
+        rg.addColorStop(0, 'rgba(180,0,0,0)'); rg.addColorStop(1, 'rgba(180,0,0,' + (0.6 * k * strength) + ')');
+        ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+        this.animated = true;
+      }
+
       // 11. Time-of-day grading and a soft vignette.
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lightAt(game.hour()); ctx.fillRect(0, 0, W, H); ctx.restore();
       const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);

@@ -541,6 +541,11 @@
       return true;
     }
 
+    hurt(amount) {
+      this.player.hp -= amount;
+      this.hurtTime = Date.now();
+      this.hurtAmount = amount;
+    }
     noise(x, y, radius) {
       for (const z of this.zombies) {
         if (Math.abs(z.x - x) <= radius && Math.abs(z.y - y) <= radius) { z.alert = true; z.tx = x; z.ty = y; z.ttl = 30; }
@@ -553,8 +558,8 @@
       const p = this.player;
       if (this.turn % 90 === 0) p.hunger = Math.max(0, p.hunger - 1);
       if (this.turn % 55 === 0) p.thirst = Math.max(0, p.thirst - 1);
-      if (p.hunger === 0 && this.turn % 20 === 0) { p.hp -= 1; if (this.turn % 100 === 0) this.log('You are starving. You know it the way you know the cold.'); }
-      if (p.thirst === 0 && this.turn % 12 === 0) { p.hp -= 1; if (this.turn % 60 === 0) this.log('There is no water. Your body keeps telling you.'); }
+      if (p.hunger === 0 && this.turn % 20 === 0) { this.hurt(1); if (this.turn % 100 === 0) this.log('You are starving. You know it the way you know the cold.'); }
+      if (p.thirst === 0 && this.turn % 12 === 0) { this.hurt(1); if (this.turn % 60 === 0) this.log('There is no water. Your body keeps telling you.'); }
       if (p.hunger === 25 && this.turn % 90 === 0) this.log('The hunger is a stone in you.');
       if (p.thirst === 25 && this.turn % 55 === 0) this.log('Your mouth is ash.');
       if (p.hp > 0 && p.hp < p.hpMax && p.hunger > 50 && p.thirst > 50 && this.turn % Math.round(40 / this.perk('regen', 1)) === 0) p.hp++;
@@ -650,7 +655,7 @@
     zombieAttack(z) {
       if (this.rng() < 0.65) {
         const dmg = 3 + Math.floor(this.rng() * 6);
-        this.player.hp -= dmg;
+        this.hurt(dmg);
         this.log('It gets its teeth in you. ' + dmg + '.');
       } else this.log('It comes at you and finds nothing.');
     }
