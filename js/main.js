@@ -170,7 +170,7 @@
     Store.deleteSave(game.place.id);
     const p = game.player;
     overlayBox.innerHTML = `<h2>Then nothing.</h2>
-      <div>The ${escapeHtml(game.className().toLowerCase())} lasted ${game.day() - 1} day${game.day() - 1 === 1 ? '' : 's'} in ${escapeHtml(game.place.name.split(',')[0])}. ${game.turn} turns of it.</div>
+      <div>The ${escapeHtml(game.className().toLowerCase())} lasted ${game.day() - 1} day${game.day() - 1 === 1 ? '' : 's'} in ${escapeHtml(game.place.name.split(',')[0])}.</div>
       <div>${p.kills} of them put down. ${p.looted} places gone through.</div>
       <div class="muted" style="margin-top:10px">The save is gone. It doesnt come back. <kbd>Enter</kbd> or <kbd>Esc</kbd>.</div>`;
     overlay.classList.add('on');

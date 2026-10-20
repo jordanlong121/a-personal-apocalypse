@@ -398,7 +398,7 @@
       const msgs = game.msgs.slice(-9).map((m, i, a) => `<div class="${i === a.length - 1 ? 'latest' : ''}">${escapeHtml(m.s)}</div>`).join('');
       this.sidebar.innerHTML = `
         <div class="place">${escapeHtml(game.place.name.split(',').slice(0, 2).join(','))}</div>
-        <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr} · turn ${game.turn}</div>
+        <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr}</div>
         <div class="where">${escapeHtml(where)}</div>
         <div class="stat"><span>Body</span>${bar(100 * p.hp / (p.hpMax || 100), p.hp > 40 ? '#5fbf6a' : '#d44')}<span class="num">${p.hp}</span></div>
         <div class="stat"><span>Food</span>${bar(p.hunger, p.hunger > 25 ? '#d9a441' : '#d44')}<span class="num">${p.hunger}</span></div>
