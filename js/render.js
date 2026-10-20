@@ -433,11 +433,6 @@
           m.beginPath(); for (let i = 0; i < f.p.length; i += 2) { const X = ox + f.p[i] * scale, Y = oy + f.p[i + 1] * scale; i ? m.lineTo(X, Y) : m.moveTo(X, Y); } m.stroke();
         }
         for (const f of place.feats) if (f.k === 'b') { m.fillStyle = USE_COLOR[f.u] || '#aaa'; poly(f.p); m.fill(); }
-        m.font = 'bold 11px sans-serif'; m.textAlign = 'center'; m.textBaseline = 'middle';
-        for (const f of place.feats) if (f.k === 'b' && f.lm && f.n && f.lm !== 'fuel' && f.lm !== 'bigbox') {
-          const X = ox + (f.b[0] + f.b[2]) / 2 * scale, Y = oy + (f.b[1] + f.b[3]) / 2 * scale;
-          m.lineWidth = 3; m.strokeStyle = 'rgba(0,0,0,0.7)'; m.strokeText(f.n, X, Y); m.fillStyle = '#f0e8d8'; m.fillText(f.n, X, Y);
-        }
         this.mapCanvas = mc;
       }
       const mc = this.mapCanvas;
