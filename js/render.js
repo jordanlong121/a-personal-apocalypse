@@ -85,6 +85,76 @@
       this.wallAngles.set(key, a);
       return a;
     }
+    // Floor textures by building use, built once at tile scale.
+    floorPattern(kind) {
+      if (!this.floors) this.floors = {};
+      if (this.floors[kind]) return this.floors[kind];
+      const P = this.tile * 4, cv = document.createElement('canvas'); cv.width = P; cv.height = P;
+      const c = cv.getContext('2d'), ts = this.tile;
+      const rnd = (seed) => { let a = seed; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; };
+      const r = rnd(kind.length * 977);
+      if (kind === 'wood') {
+        c.fillStyle = '#b08a5a'; c.fillRect(0, 0, P, P);
+        const plank = ts * 0.5;
+        for (let y = 0; y < P; y += plank) {
+          const off = (Math.floor(y / plank) % 2) * ts * 1.3;
+          for (let x = -ts * 2; x < P + ts * 2; x += ts * 2.6) {
+            const tone = 0.88 + r() * 0.24;
+            c.fillStyle = 'rgb(' + Math.round(176 * tone) + ',' + Math.round(138 * tone) + ',' + Math.round(90 * tone) + ')';
+            c.fillRect(x + off, y, ts * 2.6 - 1, plank - 1);
+          }
+        }
+        c.fillStyle = 'rgba(60,35,15,0.25)'; for (let y = 0; y < P; y += plank) c.fillRect(0, y, P, 1);
+      } else if (kind === 'tile') {
+        c.fillStyle = '#d9d4c7'; c.fillRect(0, 0, P, P);
+        const g = ts;
+        for (let y = 0; y < P; y += g) for (let x = 0; x < P; x += g) { const t = 0.94 + r() * 0.08; c.fillStyle = 'rgb(' + Math.round(217 * t) + ',' + Math.round(212 * t) + ',' + Math.round(199 * t) + ')'; c.fillRect(x + 1, y + 1, g - 2, g - 2); }
+        c.fillStyle = 'rgba(90,85,75,0.35)'; for (let y = 0; y < P; y += g) c.fillRect(0, y, P, 1); for (let x = 0; x < P; x += g) c.fillRect(x, 0, 1, P);
+      } else if (kind === 'concrete') {
+        c.fillStyle = '#9a9790'; c.fillRect(0, 0, P, P);
+        for (let k = 0; k < 400; k++) { c.fillStyle = 'rgba(' + (r() < 0.5 ? '60,58,55' : '200,198,190') + ',' + (0.08 + r() * 0.12) + ')'; c.fillRect(Math.floor(r() * P), Math.floor(r() * P), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2)); }
+        c.strokeStyle = 'rgba(40,40,40,0.25)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, P / 2 + 0.5); c.lineTo(P, P / 2 + 0.5); c.moveTo(P / 2 + 0.5, 0); c.lineTo(P / 2 + 0.5, P); c.stroke();
+      } else { // carpet
+        c.fillStyle = '#7d8a8f'; c.fillRect(0, 0, P, P);
+        for (let k = 0; k < 900; k++) { c.fillStyle = 'rgba(' + (r() < 0.5 ? '40,50,55' : '170,185,190') + ',' + (0.05 + r() * 0.1) + ')'; c.fillRect(Math.floor(r() * P), Math.floor(r() * P), 1, 1); }
+      }
+      this.floors[kind] = this.ctx.createPattern(cv, 'repeat');
+      this.floors[kind].size = P;
+      return this.floors[kind];
+    }
+
+    // The building you are standing in: textured floor clipped to the footprint, clean partition walls, shadowed outer wall.
+    drawInterior(game, i, f, p, ox, oy, ts, W, H, cols, rows) {
+      const ctx = this.ctx, world = game.world, T = global.T;
+      const kind = f.u === 'home' ? 'wood' : (f.u === 'food' || f.u === 'medical' || f.lm === 'school' || f.lm === 'hospital') ? 'tile' : (f.u === 'tools' || f.u === 'fuel' || f.rf === 'shed') ? 'concrete' : 'carpet';
+      const pat = this.floorPattern(kind), P = pat.size;
+      ctx.save();
+      ctx.clip(p);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = pat; ctx.save(); ctx.translate(-((ox * ts) % P), -((oy * ts) % P)); ctx.fillRect(0, 0, W + P, H + P); ctx.restore();
+      if (game.snow > 0.05) { ctx.fillStyle = 'rgba(230,234,238,' + (0.12 * game.snow) + ')'; ctx.fillRect(0, 0, W, H); }
+      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
+      // inner shadow along the outer wall
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2.6; ctx.stroke(p);
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.2; ctx.stroke(p);
+      ctx.restore();
+      // partition walls: merge runs of interior-wall tiles into bars
+      const isW = (x, y) => world.buildingIdxAt(x, y) === i && world.tileAt(x, y) === T.IWALL;
+      ctx.save(); ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts); ctx.lineJoin = 'round';
+      const bar = (x, y, w, h) => { ctx.fillStyle = '#6e6257'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#3e352e'; ctx.lineWidth = 0.09; ctx.strokeRect(x, y, w, h); ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(x, y, w, Math.min(0.12, h)); };
+      const th = 0.56, in0 = (1 - th) / 2;
+      for (let r = -1; r <= rows; r++) for (let c = -1; c <= cols; c++) {
+        const x = ox + c, y = oy + r; if (!isW(x, y)) continue;
+        const left = isW(x - 1, y), up = isW(x, y - 1), right = isW(x + 1, y), down = isW(x, y + 1);
+        if (!left && right) { let len = 1; while (isW(x + len, y)) len++; bar(x, y + in0, len, th); }
+        if (!up && down) { let len = 1; while (isW(x, y + len)) len++; bar(x + in0, y, th, len); }
+        if (!left && !right && !up && !down) bar(x + in0, y + in0, th, th);
+      }
+      // outer wall: dark body with a lighter top edge
+      ctx.strokeStyle = '#3e352e'; ctx.lineWidth = 1.15; ctx.stroke(p);
+      ctx.strokeStyle = '#6e6257'; ctx.lineWidth = 0.7; ctx.stroke(p);
+      ctx.restore();
+    }
     noisePattern() {
       if (this.noise) return this.noise;
       const n = 96, cv = document.createElement('canvas'); cv.width = n; cv.height = n;
@@ -200,8 +270,7 @@
       for (const i of blds) {
         const f = place.feats[i], lay = world.buildingLayout(i), p = this.path(game, i);
         if (i === inside) {
-          // Interior: tiles were drawn in pass 1 (floor, walls, interior walls); smooth the outer wall.
-          ctx.strokeStyle = '#4e4238'; ctx.lineWidth = 1.05; ctx.stroke(p);
+          this.drawInterior(game, i, f, p, ox, oy, ts, W, H, cols, rows);
           continue;
         }
         const pal = ROOF[f.rf] || ROOF.pitched;

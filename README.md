@@ -55,7 +55,8 @@ Saves store only the seed plus what changed, so they are a few kilobytes.
 - The ground is drawn straight from the OSM geometry: smooth roads with sidewalks and centre lines, paths, rail,
   rivers, lots and lawns, over a subtle noise texture. Tiles underneath still decide where you can walk.
 - Buildings show roofs (pitched with a ridge and shingles, flat with HVAC units, charred when burnt) until you step
-  inside; then the roof lifts off and you see the interior. Churches get a steeple, hospitals an H, civic buildings
+  inside; then the roof lifts off and you see the interior: hardwood, tile, concrete or carpet by building type,
+  partition walls, and a shadowed outer wall, all clipped to the real footprint. Churches get a steeple, hospitals an H, civic buildings
   a flag, arenas a ribbed roof; landmarks and large buildings carry their real names.
 - Streets are furnished: parked cars and highway traffic jams with burnt-out wrecks (walk into a car to search it),
   bins by the doors, lamps, hydrants, carts on parking lots, plus any trees, benches, bus stops and post boxes
