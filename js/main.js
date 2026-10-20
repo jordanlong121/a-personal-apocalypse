@@ -79,6 +79,7 @@
       game.onChange = () => { if (mode === 'play') render(); };
       window.__game = game; // for automation/debugging
       mode = 'play'; render();
+      focusGame();
       fetchLiveWeather(game);
       return;
     }
@@ -146,6 +147,7 @@
     game.start(pendingClass, avatarSpec);
     overlay.classList.remove('on');
     mode = 'play'; render();
+    focusGame();
     fetchLiveWeather(game);
   }
 
@@ -222,7 +224,7 @@
     overlay.classList.add('on');
   }
 
-  function closeOverlay() { overlay.classList.remove('on'); mode = 'play'; render(); }
+  function closeOverlay() { overlay.classList.remove('on'); mode = 'play'; render(); focusGame(); }
 
   const MOVE_KEYS = {
     ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
@@ -234,6 +236,8 @@
   document.addEventListener('keydown', e => {
     if (!game) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (mode !== 'avatar' && (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA')) document.activeElement.blur();
     const k = e.key, code = e.code;
     if (mode === 'dead') { if (k === 'Enter' || k === 'Escape') quit(); e.preventDefault(); return; }
     if (mode === 'avatar') {
@@ -270,7 +274,7 @@
       if (mv) game.act('close', mv); else { game.log('You leave it.'); render(); }
       e.preventDefault(); return;
     }
-    if (mv && !e.shiftKey) { game.act('move', mv); e.preventDefault(); return; }
+    if (mv) { game.act('move', mv); e.preventDefault(); return; }
     if (k === 'c') { closePending = true; game.log('Which door.'); render(); e.preventDefault(); return; }
     if (k === 'f' || k === 'F') {
       const w = game.weapon();
@@ -292,6 +296,7 @@
 
   // Mouse/touch: click a tile adjacent to the player to step there.
   canvas.addEventListener('click', e => {
+    focusGame();
     if (!game || mode !== 'play') return;
     const ts = renderer.tile, cols = Math.ceil(canvas.width / ts) + 1, rows = Math.ceil(canvas.height / ts) + 1;
     const r = canvas.getBoundingClientRect();
@@ -300,9 +305,12 @@
     else game.act('move', [Math.sign(tx), Math.sign(ty)]);
   });
 
-  $('btn-map').onclick = () => { mode = mode === 'map' ? 'play' : 'map'; render(); };
-  $('btn-save').onclick = () => { if (game) { Store.putSave(game.place.id, game.serialize()); game.log('Written down.'); render(); } };
-  $('btn-quit').onclick = quit;
+  $('btn-map').onclick = (e) => { e.currentTarget.blur(); mode = mode === 'map' ? 'play' : 'map'; render(); focusGame(); };
+  $('btn-save').onclick = (e) => { e.currentTarget.blur(); if (game) { Store.putSave(game.place.id, game.serialize()); game.log('Written down.'); render(); } focusGame(); };
+  $('btn-quit').onclick = (e) => { e.currentTarget.blur(); quit(); };
+  for (const b of document.querySelectorAll('#topbar button')) b.tabIndex = -1;
+  canvas.tabIndex = 0; canvas.style.outline = 'none';
+  function focusGame() { try { canvas.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   $('go').onclick = download;
   $('q').addEventListener('keydown', e => { if (e.key === 'Enter') download(); });
   window.addEventListener('resize', () => { if (renderer) { renderer.resize(); renderer.mapCanvas = null; renderer.paths = new Map(); renderer.wallAngles = new Map(); render(); } });

@@ -355,6 +355,16 @@
         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       }
 
+      // 10a. Low health: the edges of the screen go orange at half, deepening to red as it falls.
+      const pct = game.player.hp / (game.player.hpMax || 100);
+      if (pct < 0.5 && game.player.hp > 0) {
+        const t = Math.min(1, (0.5 - pct) / 0.5);
+        const r = 255, gch = Math.round(140 * (1 - t)), bch = 0;
+        const eg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * (0.42 - 0.12 * t), W / 2, H / 2, Math.max(W, H) * 0.72);
+        eg.addColorStop(0, 'rgba(' + r + ',' + gch + ',' + bch + ',0)'); eg.addColorStop(1, 'rgba(' + r + ',' + gch + ',' + bch + ',' + (0.35 + 0.45 * t) + ')');
+        ctx.fillStyle = eg; ctx.fillRect(0, 0, W, H);
+      }
+
       // 10b. Red flash when you have just been hurt, fading out over a third of a second.
       const hurtAge = game.hurtTime ? Date.now() - game.hurtTime : Infinity;
       if (hurtAge < 350) {
