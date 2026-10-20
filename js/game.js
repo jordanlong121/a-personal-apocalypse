@@ -4,8 +4,8 @@
   const { hash2, mulberry32 } = global.WorldUtil;
   const T = global.T, CH = global.CH;
 
-  const TURN_SECONDS = 6;           // one step ≈ one cautious metre
-  const START_HOUR = 8;
+  const TURN_SECONDS = 6;           // one step ≈ one cautious metre (hunger, thirst and weather still run per turn)
+  const START_HOUR = 8;             // unused now that the clock follows the real local time
   const INV_MAX = 16;
 
   const ITEMS = {
@@ -119,8 +119,11 @@
       this.lastShot = null;
       this.doors = new Map(); // 'x,y' -> { t: tile state, hp } for doors/windows/walls that changed from their generated state
       this.lastHorde = 0;
-      this.weather = { k: 'clear', until: 0 };
+      this.weather = { k: 'clear', until: 0, live: false };
       this.snow = 0;
+      this.startedAt = Date.now();
+      this.live = null; // last live weather reading, if any
+      this.sunCache = null;
       this.fov = { r: 0, x: 0, y: 0, data: null };
       this.onChange = null;
     }
@@ -222,9 +225,50 @@
     perk(key, dflt) { const c = CLASSES[this.player.cls]; const v = c && c.perks[key]; return v === undefined ? dflt : v; }
     className() { const c = CLASSES[this.player.cls]; return c ? c.name : 'Survivor'; }
     log(s) { this.msgs.push({ t: this.turn, s }); if (this.msgs.length > 60) this.msgs.shift(); }
-    hour() { return (START_HOUR + (this.turn * TURN_SECONDS) / 3600) % 24; }
-    day() { return Math.floor((START_HOUR * 3600 + this.turn * TURN_SECONDS) / 86400) + 1; }
-    isNight() { const h = this.hour(); return h < 6 || h >= 21; }
+    // The game clock is the player's real local clock. Sunrise and sunset come from the town's latitude and today's date.
+    hour() { const d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; }
+    day() { return Math.floor((Date.now() - (this.startedAt || Date.now())) / 86400000) + 1; }
+    sun() {
+      const key = new Date().toDateString();
+      if (this.sunCache && this.sunCache.key === key) return this.sunCache;
+      const [lat, lon] = this.place.center || [45.4, -75.7];
+      const now = new Date();
+      const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+      const rad = Math.PI / 180;
+      const decl = 23.44 * rad * Math.sin(2 * Math.PI * (284 + doy) / 365);
+      const cosH = (Math.cos(90.833 * rad) - Math.sin(lat * rad) * Math.sin(decl)) / (Math.cos(lat * rad) * Math.cos(decl));
+      let rise, set;
+      if (cosH <= -1) { rise = 0; set = 24; } else if (cosH >= 1) { rise = 12; set = 12; }
+      else {
+        const H = Math.acos(cosH) / rad / 15;
+        const B = 2 * Math.PI * (doy - 81) / 365;
+        const eot = (9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)) / 60; // hours
+        const tzOffset = -now.getTimezoneOffset() / 60;
+        const solarNoon = 12 - lon / 15 + tzOffset - eot;
+        rise = solarNoon - H; set = solarNoon + H;
+      }
+      this.sunCache = { key, rise, set };
+      return this.sunCache;
+    }
+    // 0 by day, 1 at night, easing through dusk and dawn.
+    nightness() {
+      const h = this.hour(), { rise, set } = this.sun();
+      if (h >= rise + 0.5 && h <= set - 0.3) return 0;
+      if (h > set - 0.3 && h < set + 1.4) return (h - (set - 0.3)) / 1.7;
+      if (h > rise - 1.2 && h < rise + 0.5) return ((rise + 0.5) - h) / 1.7;
+      return 1;
+    }
+    isNight() { return this.nightness() >= 0.6; }
+    phase() {
+      const h = this.hour(), { rise, set } = this.sun();
+      if (h >= rise - 1 && h < rise + 0.5) return 'dawn';
+      if (h >= rise + 0.5 && h < 11) return 'morning';
+      if (h >= 11 && h < 14) return 'midday';
+      if (h >= 14 && h < set - 1.5) return 'afternoon';
+      if (h >= set - 1.5 && h < set - 0.3) return 'evening';
+      if (h >= set - 0.3 && h < set + 0.8) return 'dusk';
+      return 'night';
+    }
     hasItem(id) { return this.player.inv.includes(id); }
     weapon() { return this.player.weapon ? ITEMS[this.player.weapon] : FISTS; }
     viewRadius() { return 13; } // same sight range day and night; unexplored areas are still revealed only within it
@@ -325,7 +369,8 @@
     // ---- weather -----------------------------------------------------------------
     updateWeather() {
       const w = this.weather;
-      if (this.turn >= w.until) {
+      if (w.live && this.live && Date.now() - this.live.at > 30 * 60000) { w.live = false; w.until = this.turn; } // reading went stale
+      if (!w.live && this.turn >= w.until) {
         const r = this.rng(), prev = w.k;
         w.k = r < 0.38 ? 'clear' : r < 0.62 ? 'overcast' : r < 0.78 ? 'rain' : r < 0.86 ? 'fog' : 'snow';
         w.until = this.turn + 400 + Math.floor(this.rng() * 1400);
@@ -336,6 +381,17 @@
       else this.snow = Math.max(0, this.snow - 1 / 1200);
     }
     weatherName() { return { clear: 'clear', overcast: 'overcast', rain: 'rain', fog: 'fog', snow: 'snowing' }[this.weather.k]; }
+    // Live weather from the real world (WMO code from Open-Meteo). Holds until the next reading; procedural weather pauses.
+    applyLiveWeather(r) {
+      const code = r.code | 0;
+      const kind = code === 0 || code === 1 || code === 2 ? 'clear' : code === 3 ? 'overcast' : code === 45 || code === 48 ? 'fog'
+        : (code >= 71 && code <= 77) || code === 85 || code === 86 ? 'snow' : (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95 ? 'rain' : 'overcast';
+      const prev = this.weather.k, first = !this.live;
+      this.weather = { k: kind, until: Infinity, live: true };
+      if (typeof r.snowDepth === 'number') this.snow = Math.max(0, Math.min(1, r.snowDepth / 0.25));
+      this.live = { temp: r.temp, code, wind: r.wind, at: Date.now() };
+      if (first || kind !== prev) this.log('Outside, ' + (typeof r.temp === 'number' ? Math.round(r.temp) + ' degrees and ' : 'it is ') + { clear: 'clear', overcast: 'grey', rain: 'raining', fog: 'fog', snow: 'snowing' }[kind] + '. The same as out your window.');
+    }
 
     // ---- hordes ------------------------------------------------------------------
     maybeSpawnHorde() {
@@ -671,14 +727,14 @@
       }
       const doors = [...this.doors].map(([k, d]) => [...k.split(',').map(Number), d.t, d.hp]);
       return { v: 1, placeId: this.place.id, seed: this.seed, turn: this.turn, player: this.player, nextId: this.nextId, doors,
-        zombies: this.zombies.map(z => ({ x: z.x, y: z.y, hp: z.hp, h: z.horde ? 1 : 0 })), lastHorde: this.lastHorde, weather: this.weather, snow: this.snow, spawned, looted, seen, msgs: this.msgs.slice(-10), saved: Date.now() };
+        zombies: this.zombies.map(z => ({ x: z.x, y: z.y, hp: z.hp, h: z.horde ? 1 : 0 })), lastHorde: this.lastHorde, weather: this.weather.live ? { k: this.weather.k, until: this.turn } : this.weather, snow: this.snow, startedAt: this.startedAt, spawned, looted, seen, msgs: this.msgs.slice(-10), saved: Date.now() };
     }
     static restore(place, data) {
       const g = new Game(place, data.seed);
       g.turn = data.turn; g.player = data.player; if (!g.player.ammo) g.player.ammo = {}; if (!g.player.hpMax) g.player.hpMax = 100; g.nextId = data.nextId || 1; g.msgs = data.msgs || [];
       for (const k of data.spawned) { const [cx, cy] = k.split(',').map(Number); g.world.getChunk(cx, cy).spawned = true; }
       for (const z of data.zombies) { const zz = g.addZombie(z.x, z.y, null, z.hp); if (z.h) zz.horde = true; }
-      g.lastHorde = data.lastHorde || 0; if (data.weather) g.weather = data.weather; g.snow = data.snow || 0;
+      g.lastHorde = data.lastHorde || 0; if (data.weather) g.weather = Object.assign({ live: false }, data.weather); g.snow = data.snow || 0; g.startedAt = data.startedAt || Date.now();
       for (const [x, y, opened, items] of data.looted) { const c = g.world.containerAt(x, y) || g.world.carAt(x, y); if (c) { c.opened = !!opened; c.items = items; } }
       for (const [x, y, t, hp] of data.doors || []) g.setDoor(x, y, t, hp);
       for (const k in data.seen) { const [cx, cy] = k.split(',').map(Number); unrle(data.seen[k], g.world.getChunk(cx, cy).seen); }

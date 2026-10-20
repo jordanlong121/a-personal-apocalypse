@@ -28,11 +28,13 @@
     return 'rgb(' + r + ',' + g + ',' + bl + ')';
   }
   // Light colour by hour (multiplied over the scene). Keyframes: hour -> [r,g,b].
-  const LIGHT = [[0, [120, 130, 180]], [5, [120, 130, 180]], [6.5, [255, 205, 170]], [8, [255, 255, 255]], [17, [255, 255, 255]], [18.5, [255, 195, 150]], [20, [170, 150, 170]], [21.5, [120, 130, 180]], [24, [120, 130, 180]]];
-  function lightAt(h) {
+  function lightAt(h, sun) {
+    const { rise, set } = sun;
+    const LIGHT = [[-1, [120, 130, 180]], [rise - 1.2, [120, 130, 180]], [rise - 0.2, [255, 200, 165]], [rise + 1.2, [255, 255, 255]], [set - 1.5, [255, 255, 255]],
+      [set - 0.2, [255, 195, 150]], [set + 0.6, [170, 150, 170]], [set + 1.4, [120, 130, 180]], [25, [120, 130, 180]]];
     for (let i = 0; i + 1 < LIGHT.length; i++) {
       const [h0, c0] = LIGHT[i], [h1, c1] = LIGHT[i + 1];
-      if (h >= h0 && h <= h1) { const t = (h - h0) / (h1 - h0); return 'rgb(' + c0.map((v, k) => Math.round(v + (c1[k] - v) * t)).join(',') + ')'; }
+      if (h >= h0 && h <= h1) { const t = h1 > h0 ? (h - h0) / (h1 - h0) : 0; return 'rgb(' + c0.map((v, k) => Math.round(v + (c1[k] - v) * t)).join(',') + ')'; }
     }
     return '#fff';
   }
@@ -365,14 +367,14 @@
       }
 
       // 11. Time-of-day grading and a soft vignette.
-      ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lightAt(game.hour()); ctx.fillRect(0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lightAt(game.hour(), game.sun()); ctx.fillRect(0, 0, W, H); ctx.restore();
       const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
       vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.45)');
       ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
       // 12. At night, dim everything outside your sight with a soft edge (a tile-resolution mask scaled up with
       // smoothing). By day there is no dimming at all; loot and zombies are still only drawn within sight.
-      const nightness = (() => { const h = game.hour(); if (h >= 7 && h <= 18) return 0; if (h > 18 && h < 21.5) return (h - 18) / 3.5; if (h >= 5 && h < 7) return (7 - h) / 2; return 1; })();
+      const nightness = game.nightness();
       if (nightness > 0.02 && (!this.mask || this.mask.width !== cols || this.mask.height !== rows)) { this.mask = document.createElement('canvas'); this.mask.width = cols; this.mask.height = rows; }
       if (nightness > 0.02) {
         const mctx = this.mask.getContext('2d'), mimg = mctx.createImageData(cols, rows), a = Math.round(140 * nightness);
@@ -398,7 +400,8 @@
         if (near) where = 'Near ' + near;
       }
       const h = game.hour(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
-      const timeStr = `Day ${game.day()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${game.weatherName()}${game.isNight() ? ' · night' : ''}`;
+      const temp = game.live && typeof game.live.temp === 'number' ? ' · ' + Math.round(game.live.temp) + '°' : '';
+      const timeStr = `Day ${game.day()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${game.phase()} · ${game.weatherName()}${temp}`;
       let inv = '';
       p.inv.forEach((id, i) => {
         const it = ITEMS[id];

@@ -79,6 +79,7 @@
       game.onChange = () => { if (mode === 'play') render(); };
       window.__game = game; // for automation/debugging
       mode = 'play'; render();
+      fetchLiveWeather(game);
       return;
     }
     game = new Game(place, (Math.random() * 0xffffffff) >>> 0);
@@ -145,6 +146,7 @@
     game.start(pendingClass, avatarSpec);
     overlay.classList.remove('on');
     mode = 'play'; render();
+    fetchLiveWeather(game);
   }
 
   function quit() {
@@ -159,11 +161,38 @@
     if (mode === 'map') renderer.drawMap(game); else renderer.draw(game);
     if (game.dead && mode !== 'dead') showDeath();
   }
-  // Weather and smoke animate; redraw at a modest rate only while something is moving.
+  // Weather and smoke animate; redraw at a modest rate only while something is moving. The clock is real time,
+  // so also redraw when the minute changes and the light moves on without you.
+  let lastMinute = -1;
   (function animate() {
-    if (game && mode === 'play' && renderer && renderer.animated) renderer.draw(game);
+    if (game && mode === 'play' && renderer) {
+      const m = Math.floor(game.hour() * 60);
+      if (renderer.animated || m !== lastMinute) { lastMinute = m; renderer.draw(game); }
+    }
     setTimeout(animate, 70);
   })();
+
+  // Live weather for the town from Open-Meteo (free, no key). Refreshed every ten minutes while you play.
+  async function fetchLiveWeather(g) {
+    if (!g || !g.place.center || !navigator.onLine) return;
+    const [lat, lon] = g.place.center;
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&current=temperature_2m,weather_code,wind_speed_10m,snowfall&hourly=snow_depth&forecast_days=1&timezone=auto`;
+      const res = await fetch(url); if (!res.ok) return;
+      const j = await res.json();
+      if (!j.current) return;
+      let snowDepth;
+      if (j.hourly && j.hourly.snow_depth && j.hourly.time) {
+        const hourKey = j.current.time.slice(0, 13);
+        const i = j.hourly.time.findIndex(t => t.startsWith(hourKey));
+        if (i >= 0 && typeof j.hourly.snow_depth[i] === 'number') snowDepth = j.hourly.snow_depth[i];
+      }
+      if (game !== g) return;
+      g.applyLiveWeather({ code: j.current.weather_code, temp: j.current.temperature_2m, wind: j.current.wind_speed_10m, snowDepth });
+      if (mode === 'play') render();
+    } catch (e) { /* offline or blocked: the made-up weather carries on */ }
+  }
+  setInterval(() => fetchLiveWeather(game), 10 * 60000);
 
   function showDeath() {
     mode = 'dead';
@@ -187,7 +216,7 @@
       <div>Now and then they come in numbers. You will hear it first. They come straight on and they will take a door, a window, and in time a wall.</div>
       <div><kbd>F</kbd> and a direction fires what is in your hands, in a line. The bow reaches 8 and is quiet. Shotgun 6. Pistol 10. Rifle 16. Guns carry. Rounds go in a pouch and dont take pack room.</div>
       <div><kbd>.</kbd> or <kbd>space</kbd> waits. <kbd>m</kbd> is the map. <kbd>S</kbd> writes it down. <kbd>Esc</kbd> goes back to the title and writes it down on the way.</div>
-      <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. Under a quarter of it you stagger, and the lower it goes the less your steps are your own. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
+      <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The clock on the wall is your clock: it is the same time in here as it is where you sit, and the sun goes down when yours does. The weather is whatever the weather is there, when the net is on. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. Under a quarter of it you stagger, and the lower it goes the less your steps are your own. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
       <div class="muted">On the map. Gold is food. Red is medicine. Blue is tools. Purple is guns. Orange is gas.</div>
       <div class="muted" style="margin-top:10px">Any key.</div>`;
     overlay.classList.add('on');

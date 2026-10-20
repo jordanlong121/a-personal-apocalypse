@@ -60,7 +60,9 @@ Saves store only the seed plus what changed, so they are a few kilobytes.
 - Streets are furnished: parked cars and highway traffic jams with burnt-out wrecks (walk into a car to search it),
   bins by the doors, lamps, hydrants, carts on parking lots, plus any trees, benches, bus stops and post boxes
   that OSM maps.
-- Weather changes every few hours: clear, overcast, rain, fog (zombies notice you later) and snow, which settles
+- The clock is your real local clock, with sunrise and sunset computed for the town's latitude, and the HUD names the
+  phase: dawn, morning, midday, afternoon, evening, dusk, night. When online the weather is the town's real weather
+  from Open-Meteo, refreshed every ten minutes (temperature shown in the HUD). Offline, weather changes every few hours: clear, overcast, rain, fog (zombies notice you later) and snow, which settles
   on the ground and roofs. Light shifts through dawn, day, dusk and night. A few buildings burn with drifting smoke.
 - Everything beyond your sight is drawn slightly dimmed with a soft edge and shows no loot or zombies.
 
