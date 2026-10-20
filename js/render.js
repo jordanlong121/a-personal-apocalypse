@@ -405,11 +405,12 @@
         <div class="stat"><span>Water</span>${bar(p.thirst, p.thirst > 25 ? '#5a9bd8' : '#d44')}<span class="num">${p.thirst}</span></div>
         <div class="weapon">In hand: <b>${w.name}</b> <span class="muted">(dmg ${w.dmg}${w.ranged ? ', range ' + w.range + ', ' + (p.ammo[w.ammo] || 0) + ' ' + ITEMS[w.ammo].short : ''})</span> · Put down: ${p.kills}</div>
         <div class="muted">Rounds: ${Object.entries(p.ammo || {}).filter(([, n]) => n > 0).map(([id, n]) => n + ' ' + ITEMS[id].short).join(' · ') || 'none'}</div>
-        <div class="section">Pack <span class="muted">(${p.inv.length}/16) · a letter uses it</span></div>
+        <div class="section">Pack <span class="muted">(${p.inv.length}/16)</span></div>
+        <div class="muted">u and a letter uses it. d and a letter leaves it.</div>
         <div class="inv">${inv}</div>
         <div class="section">What happened</div>
         <div class="log">${msgs}</div>
-        <div class="help muted">move: arrows / numpad / hjklyubn · g search beside you · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
+        <div class="help muted">move: arrows / numpad · u use · g search beside you · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
     }
 
     drawMap(game) {

@@ -179,9 +179,9 @@
   function showHelp() {
     mode = 'help';
     overlayBox.innerHTML = `<h2>What you need to know</h2>
-      <div><kbd>←↑→↓</kbd>, the numpad, or <kbd>h j k l y u b n</kbd> to walk. Walk into one of them to hit it.</div>
+      <div><kbd>←↑→↓</kbd> or the numpad to walk. The numpad corners go diagonal. Walk into one of them to hit it.</div>
       <div>Walk into a fridge, a shelf, a locker, a car, and you go through it. <kbd>g</kbd> goes through whatever is beside you.</div>
-      <div><kbd>a</kbd> to <kbd>p</kbd> uses a thing. Eat it, drink it, bind with it, take it up. <kbd>d</kbd> and a letter leaves it behind.</div>
+      <div><kbd>u</kbd> and a letter uses a thing from the pack. Eat it, drink it, bind with it, take it up. <kbd>d</kbd> and a letter leaves it behind.</div>
       <div>Doors start shut. Walk into one and it opens. <kbd>c</kbd> and a direction shuts it behind you. A shut door stops them and hides you, but one that knows you are in there will pound on it until it goes, and that takes a while and makes a noise. Walk into a window and the glass goes and you can climb through. What breaks stays broken.</div>
       <div>The cars are still in the streets and piled up on the highways. The houses keep their roofs until you are inside.</div>
       <div>Now and then they come in numbers. You will hear it first. They come straight on and they will take a door, a window, and in time a wall.</div>
@@ -197,11 +197,10 @@
 
   const MOVE_KEYS = {
     ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
-    h: [-1, 0], l: [1, 0], k: [0, -1], j: [0, 1], y: [-1, -1], u: [1, -1], b: [-1, 1], n: [1, 1],
     Numpad4: [-1, 0], Numpad6: [1, 0], Numpad8: [0, -1], Numpad2: [0, 1], Numpad7: [-1, -1], Numpad9: [1, -1], Numpad1: [-1, 1], Numpad3: [1, 1],
     Home: [-1, -1], PageUp: [1, -1], End: [-1, 1], PageDown: [1, 1],
   };
-  let dropPending = false, firePending = false, closePending = false;
+  let dropPending = false, firePending = false, closePending = false, usePending = false;
 
   document.addEventListener('keydown', e => {
     if (!game) return;
@@ -224,6 +223,11 @@
     if (dropPending) {
       dropPending = false;
       if (k.length === 1 && k >= 'a' && k <= 'p') game.act('drop', k.charCodeAt(0) - 97); else game.log('You keep it.');
+      render(); e.preventDefault(); return;
+    }
+    if (usePending) {
+      usePending = false;
+      if (k.length === 1 && k >= 'a' && k <= 'p') game.act('use', k.charCodeAt(0) - 97); else game.log('You leave it where it is.');
       render(); e.preventDefault(); return;
     }
     const mv = MOVE_KEYS[code] || MOVE_KEYS[k];
@@ -249,11 +253,12 @@
     if (k === '.' || k === ' ' || code === 'Numpad5') { game.act('wait'); e.preventDefault(); return; }
     if (k === 'g' || k === ',') { game.act('grab'); e.preventDefault(); return; }
     if (k === 'd') { dropPending = true; game.log('Leave what.'); render(); e.preventDefault(); return; }
+    if (k === 'u') { if (!game.player.inv.length) { game.log('Nothing in the pack.'); } else { usePending = true; game.log('Use what.'); } render(); e.preventDefault(); return; }
     if (k === 'm') { mode = 'map'; render(); e.preventDefault(); return; }
     if (k === 'S') { const ok = Store.putSave(game.place.id, game.serialize()); game.log(ok ? 'Written down.' : 'It wouldnt write. The browser is keeping nothing.'); render(); e.preventDefault(); return; }
     if (k === '?') { showHelp(); e.preventDefault(); return; }
     if (k === 'Escape') { quit(); e.preventDefault(); return; }
-    if (k.length === 1 && k >= 'a' && k <= 'p') { game.act('use', k.charCodeAt(0) - 97); e.preventDefault(); return; }
+
   });
 
   // Mouse/touch: click a tile adjacent to the player to step there.

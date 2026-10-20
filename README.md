@@ -28,8 +28,8 @@ Each has a starting kit and a perk (see `CLASSES` in `js/game.js`). Then you cho
 skin tones, hair, beards and headwear, or mix your own; the outfit follows the class (see `Sprites.avatar`).
 All on-screen text is written flat and spare, after Cormac McCarthy's The Road.
 
-- Arrows, numpad, or `hjklyubn` move. Walk into a zombie to attack it.
-- Walk into a fridge, shelf, locker or car to search it. `g` searches whatever is beside you. Letters `a`–`p` use an item (eat, drink, heal, wield).
+- Arrows or numpad move (numpad corners for diagonals). Walk into a zombie to attack it.
+- Walk into a fridge, shelf, locker or car to search it. `g` searches whatever is beside you. `u` then a letter uses an item (eat, drink, heal, wield).
 - `F` then a direction fires a wielded ranged weapon (bow 8, shotgun 6, pistol 10, rifle 16 tiles). Guns are loud.
 - Doors start closed: walk into one to open it, `c` + direction closes it. Alert zombies pound on closed doors for many turns before they break through.
 - Windows: walk into one to smash it and climb through. Hordes roam in occasionally and will batter down doors, windows and eventually walls.
