@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Personal Apocalypse</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon.png">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b0c10; color: #d8d4c8; font-family: "Segoe UI", system-ui, sans-serif; }
+  #title { max-width: 760px; margin: 0 auto; padding: 48px 24px; }
+  #title h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: 2px; font-family: Georgia, serif; color: #e8dcc2; }
+  #title .sub { color: #8f8a7e; margin-bottom: 28px; }
+  .row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; align-items: center; }
+  input, select, button { font: inherit; padding: 8px 12px; background: #15171d; color: #e6e2d6; border: 1px solid #3a3d47; border-radius: 4px; }
+  input { flex: 1; min-width: 220px; }
+  button { cursor: pointer; } button:hover { background: #22252d; } button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: #5a3b2a; border-color: #8a5a3a; } button.primary:hover { background: #6d4733; }
+  button.danger { color: #e88; }
+  #status { min-height: 22px; color: #c9b87a; margin: 6px 0 18px; white-space: pre-wrap; }
+  .places { display: flex; flex-direction: column; gap: 8px; }
+  .card { display: flex; align-items: center; gap: 12px; background: #13151a; border: 1px solid #2a2d36; border-radius: 6px; padding: 10px 14px; }
+  .card .name { flex: 1; } .card .name b { display: block; } .card .name span { color: #8f8a7e; font-size: 13px; }
+  .note { color: #8f8a7e; font-size: 13px; line-height: 1.5; margin-top: 28px; }
+  .note a { color: #c9b87a; }
+  #game { display: none; height: 100%; }
+  #game.on { display: flex; }
+  #view { flex: 1; position: relative; min-width: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  #side { width: 320px; background: #101216; border-left: 1px solid #262930; padding: 12px 14px; overflow: hidden; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #side .place { font-weight: 600; color: #e8dcc2; font-size: 15px; }
+  #side .time, #side .where { color: #a9a496; font-size: 13px; }
+  #side .where { color: #c9b87a; margin-bottom: 6px; }
+  .stat { display: grid; grid-template-columns: 48px 1fr 32px; gap: 8px; align-items: center; }
+  .stat .num { text-align: right; color: #a9a496; font-size: 13px; }
+  .bar { height: 10px; background: #1f2229; border-radius: 3px; overflow: hidden; } .bar div { height: 100%; }
+  .weapon { margin: 6px 0; }
+  .section { margin-top: 8px; color: #e8dcc2; font-weight: 600; border-bottom: 1px solid #262930; padding-bottom: 2px; }
+  .muted { color: #7f7b70; font-weight: normal; font-size: 12px; }
+  .inv { min-height: 60px; max-height: 32%; overflow: auto; }
+  .item .key { display: inline-block; width: 16px; color: #c9b87a; font-family: monospace; }
+  .cat-food { color: #e2c070; } .cat-drink { color: #8fc0e8; } .cat-med { color: #ef8a8a; } .cat-weapon { color: #e0d6c2; } .cat-tool { color: #a9b8c9; }
+  .log { flex: 1; overflow: hidden; font-size: 13px; color: #9f9a8c; line-height: 1.35; } .log .latest { color: #e6e2d6; }
+  .help { margin-top: auto; }
+  #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.65); }
+  #overlay.on { display: flex; }
+  #overlay .box { background: #15171d; border: 1px solid #3a3d47; border-radius: 8px; padding: 24px 28px; max-width: 720px; line-height: 1.5; max-height: 92%; overflow: auto; }
+  .cls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cls { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; line-height: 1.35; }
+  .cls b { color: #e8dcc2; } .cls span { color: #a9a496; font-size: 13px; }
+  .cls:hover { border-color: #8a5a3a; }
+  #overlay h2 { margin: 0 0 10px; font-family: Georgia, serif; color: #e8dcc2; }
+  #overlay kbd { background: #23262e; padding: 1px 6px; border-radius: 3px; font-family: monospace; }
+  #topbar { position: absolute; top: 8px; left: 10px; display: flex; gap: 6px; }
+  #topbar button { padding: 4px 10px; font-size: 13px; background: rgba(20,22,28,.85); }
+</style>
+</head>
+<body>
+  <div id="title">
+    <h1>A PERSONAL APOCALYPSE</h1>
+    <div class="sub">A roguelike built from real map data. Type any town or neighbourhood; the game downloads it once and plays offline after that.</div>
+    <div class="row">
+      <input id="q" placeholder="e.g. Carleton Place, Ontario — or Westboro, Ottawa" autocomplete="off">
+      <select id="radius">
+        <option value="1000">2 × 2 km (fast)</option>
+        <option value="1500" selected>3 × 3 km</option>
+        <option value="2500">5 × 5 km (large, slow)</option>
+      </select>
+      <button id="go" class="primary">Download &amp; play</button>
+    </div>
+    <div id="status"></div>
+    <div class="section" style="color:#e8dcc2;font-weight:600;margin-bottom:8px">Your places</div>
+    <div id="places" class="places"></div>
+    <div class="note">
+      Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, ODbL. Downloads use the public Nominatim and Overpass services, which are run by volunteers; please be gentle with the large option.
+      Everything is generated from building footprints, road networks and land use: interiors, loot and zombies are procedural and seeded, so a place plays the same way every time at the same seed.
+    </div>
+  </div>
+
+  <div id="game">
+    <div id="view">
+      <canvas id="canvas"></canvas>
+      <div id="topbar"><button id="btn-map">Map (m)</button><button id="btn-save">Save (S)</button><button id="btn-quit">Quit to title</button></div>
+      <div id="overlay"><div class="box" id="overlay-box"></div></div>
+    </div>
+    <div id="side"></div>
+  </div>
+
+  <script src="data/bundled.js"></script>
+  <script src="js/osm.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

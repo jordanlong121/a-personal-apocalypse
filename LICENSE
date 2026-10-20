@@ -1,0 +1,31 @@
+A Personal Apocalypse — Source-Available License
+
+Copyright (c) 2026 Jordan Long. All rights reserved.
+
+This repository is published so that its source code can be read. Publishing it
+does not grant any licence to it.
+
+1. Permitted. You may view the source code in this repository and run the game
+   for your own personal, non-commercial use.
+
+2. Reserved. Except as stated in section 1, all rights in this software are
+   reserved by the copyright holder. Without prior written permission from the
+   copyright holder you may not copy, modify, adapt, translate, merge, publish,
+   distribute, sublicense, sell, host, or create derivative works from this
+   software or any part of it, nor use it to train machine-learning models.
+   Forking on GitHub solely to the extent GitHub's Terms of Service require for
+   viewing is tolerated; no other right is implied by a fork.
+
+3. Third-party content. The map data in data/bundled.js and any map data the
+   game downloads are derived from OpenStreetMap and are (c) OpenStreetMap
+   contributors, available under the Open Database License (ODbL) 1.0,
+   https://opendatacommons.org/licenses/odbl/1-0/. The ODbL governs that data;
+   this licence governs only the game's code and artwork.
+
+4. No warranty. This software is provided "as is", without warranty of any
+   kind, express or implied. In no event shall the copyright holder be liable
+   for any claim, damages, or other liability arising from the software or its
+   use.
+
+5. Permission requests. Contact the copyright holder through the GitHub
+   repository to ask for rights beyond section 1.
