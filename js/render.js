@@ -180,6 +180,8 @@
       for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) chunksInView.push(world.getChunk(cx, cy));
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const x = ox + c, y = oy + r, t = world.tileAt(x, y);
+        // The building you are in: redraw its floor and interior walls over any lawn or lot polygon painted in pass 2.
+        if (inside >= 0 && world.buildingIdxAt(x, y) === inside) { ctx.fillStyle = tileColor(t === T.WALL_BROKEN ? T.FLOOR : t); ctx.fillRect(c * ts, r * ts, ts, ts); }
         if (t === T.TREE) SP.draw(ctx, hash2(7, x, y) < 0.45 ? 'pine' : 'tree', c * ts, r * ts, ts);
         else if (t === T.WALL_BROKEN) { ctx.fillStyle = tileColor(T.FLOOR); ctx.fillRect(c * ts, r * ts, ts, ts); SP.draw(ctx, 'rubble', c * ts, r * ts, ts); }
       }
