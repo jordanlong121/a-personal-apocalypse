@@ -4,7 +4,11 @@ A turn-based zombie survival roguelike that runs in a browser with no server.
 Type a town or neighbourhood; the game downloads the real buildings, roads, land use
 and shops from OpenStreetMap once, stores them in the browser, and plays offline after that.
 
-## Run it
+## Play it now
+
+https://jordanlong121.github.io/a-personal-apocalypse/ — nothing to install. The page is the game.
+
+## Run it locally
 
 Double-click `index.html`. That is all. Downloads of new places need internet; the
 bundled Carleton Place sample works with none.
