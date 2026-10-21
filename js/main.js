@@ -7,6 +7,15 @@
   let game = null, renderer = null, mode = 'play';
 
   function setStatus(s) { statusEl.textContent = s; }
+  const progressEl = $('progress');
+  // stage: text under the bar; frac: 0..1 for a known amount, null for "busy, unknown"; off: hide
+  function setProgress(stage, frac, off) {
+    if (off) { progressEl.classList.remove('on', 'busy'); return; }
+    progressEl.classList.add('on');
+    progressEl.classList.toggle('busy', frac === null);
+    progressEl.querySelector('.fill').style.width = frac === null ? '30%' : Math.round(frac * 100) + '%';
+    progressEl.querySelector('.pct').textContent = stage;
+  }
 
   // ---- title screen ----------------------------------------------------------
   async function refreshPlaces() {
@@ -41,25 +50,35 @@
     const q = $('q').value.trim(); if (!q) return;
     const radius = parseInt($('radius').value, 10);
     $('go').disabled = true;
+    const t0 = Date.now();
     try {
-      setStatus('Looking for ' + q + '.');
+      setStatus('Looking for ' + q + '.'); setProgress('finding it', null);
       const g = await OSM.geocode(q);
       setStatus('There it is. ' + g.name);
       const bbox = OSM.bboxAround(g.lat, g.lon, radius);
-      const raw = await OSM.fetchOverpass(bbox, setStatus);
-      setStatus('Laying the town out. ' + raw.elements.length + ' pieces of it.');
+      setProgress('waiting on the map', null);
+      const raw = await OSM.fetchOverpass(bbox, setStatus, (got, total) => {
+        const mb = (got / 1048576).toFixed(1) + ' MB';
+        if (total) setProgress(mb + ' of ' + (total / 1048576).toFixed(1) + ' MB', got / total);
+        else setProgress(mb + ' · ' + Math.round((Date.now() - t0) / 1000) + 's', null);
+      });
+      setStatus('Laying the town out. ' + raw.elements.length + ' pieces of it.'); setProgress('laying it out', null);
       await new Promise(r => setTimeout(r, 20));
       const id = OSM.slug(g.name.split(',').slice(0, 2).join(' ')) + '-' + radius;
       const place = OSM.compact(raw, { id, name: g.name, bbox, center: [g.lat, g.lon] }, 1);
       if (place.stats.buildings < 40) { setStatus('Hardly anything mapped there. ' + place.stats.buildings + ' buildings. Try a closer name, like Perth, Lanark County, or a town centre, or a wider reach.'); $('go').disabled = false; return; }
+      setProgress('writing it down', 0.95);
       await Store.putPlace(place);
+      setProgress('done', 1);
       setStatus(place.name.split(',')[0] + '. ' + place.stats.buildings + ' buildings. ' + place.stats.roads + ' roads. ' + place.stats.pois + ' places that mattered once.');
       await refreshPlaces();
       launchPlace(place, false);
     } catch (e) {
+      setProgress('', 0, true);
       setStatus('It didnt work. ' + e.message + (location.protocol === 'file:' ? '\nIf the file is opened straight from disk and this keeps failing, serve the folder: python3 -m http.server 8000' : ''));
     }
     $('go').disabled = false;
+    setTimeout(() => setProgress('', 0, true), 1500);
   }
 
   async function launch(p, cont) {

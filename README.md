@@ -52,7 +52,7 @@ Saves store only the seed plus what changed, so they are a few kilobytes.
 
 ## How it looks
 
-- The ground is drawn straight from the OSM geometry: smooth roads with sidewalks and centre lines, paths, rail,
+- The ground is drawn straight from the OSM geometry: smooth roads with sidewalks, centre lines and street names, paths, rail,
   rivers, lots and lawns, over a subtle noise texture. Tiles underneath still decide where you can walk.
 - Buildings show roofs (pitched with a ridge and shingles, flat with HVAC units, charred when burnt) until you step
   inside; then the roof lifts off and you see the interior: hardwood, tile, concrete or carpet by building type,

@@ -232,6 +232,32 @@
       strokeAll(f => isStreet(f) && f.br, '#c9c4b4', f => f.w + 0.9, [0.8, 0.8]);                               // railings
       strokeAll(f => isStreet(f) && f.br, roadCol, f => f.w);
       if (snow < 0.5) strokeAll(f => isStreet(f) && f.w >= 6 && f.t !== 'service' && f.t !== 'living_street', f => f.w >= 8 ? '#b9a84a' : '#a09a7c', () => 0.22, [2.5, 2.5]);
+      // Street names, laid along the road every so often, upright whichever way the road runs.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.font = 'bold ' + Math.max(9, Math.floor(ts * 0.5)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const labelSpacing = 42; // tiles between repeats of a name
+      for (const [i, f] of roads) {
+        if (!f.n || !isStreet(f) || f.w < 4) continue;
+        const text = f.n, tw = ctx.measureText(text).width;
+        let acc = labelSpacing * 0.55; // first label partway in
+        for (let k = 0; k + 3 < f.p.length; k += 2) {
+          const ax = f.p[k], ay = f.p[k + 1], bx = f.p[k + 2], by = f.p[k + 3];
+          const len = Math.hypot(bx - ax, by - ay);
+          acc += len;
+          if (acc < labelSpacing || len * ts < tw + ts) continue;
+          acc = 0;
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          const sx = (mx - ox) * ts, sy = (my - oy) * ts;
+          if (sx < -tw || sy < -ts || sx > W + tw || sy > H + ts) continue;
+          let ang = Math.atan2(by - ay, bx - ax);
+          if (ang > Math.PI / 2) ang -= Math.PI; else if (ang < -Math.PI / 2) ang += Math.PI;
+          ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
+          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(20,20,24,0.75)'; ctx.strokeText(text, 0, 0);
+          ctx.fillStyle = 'rgba(235,228,210,0.9)'; ctx.fillText(text, 0, 0);
+          ctx.restore();
+        }
+      }
+      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
       for (const i of list) {
         const f = place.feats[i]; if (f.k !== 'f') continue;
         ctx.strokeStyle = f.t === 'hedge' ? '#2f5a2a' : f.t === 'wall' ? '#6e6258' : '#7a5a35'; ctx.lineWidth = f.t === 'hedge' ? 0.8 : 0.3;

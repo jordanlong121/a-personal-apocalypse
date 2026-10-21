@@ -58,7 +58,7 @@ out geom;`;
     return [lat - dLat, lon - dLon, lat + dLat, lon + dLon]; // s, w, n, e
   }
 
-  async function fetchOverpass(bbox, onStatus) {
+  async function fetchOverpass(bbox, onStatus, onProgress) {
     const body = 'data=' + encodeURIComponent(overpassQuery(bbox));
     let lastErr = null;
     for (const url of OVERPASS_MIRRORS) {
@@ -75,7 +75,21 @@ out geom;`;
         });
         clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + host);
-        const json = await res.json();
+        // Stream the body so the caller can show how much has come down (Overpass rarely sends a length).
+        const total = parseInt(res.headers.get('Content-Length') || '0', 10) || 0;
+        let text;
+        if (res.body && res.body.getReader) {
+          const reader = res.body.getReader(), chunks = []; let got = 0;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value); got += value.length;
+            if (onProgress) onProgress(got, total);
+          }
+          const all = new Uint8Array(got); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
+          text = new TextDecoder().decode(all);
+        } else text = await res.text();
+        const json = JSON.parse(text);
         if (!json.elements) throw new Error('Malformed response from ' + host);
         return json;
       } catch (e) {

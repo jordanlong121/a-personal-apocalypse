@@ -19,7 +19,14 @@
   button { cursor: pointer; } button:hover { background: #22252d; } button:disabled { opacity: .5; cursor: default; }
   button.primary { background: #5a3b2a; border-color: #8a5a3a; } button.primary:hover { background: #6d4733; }
   button.danger { color: #e88; }
-  #status { min-height: 22px; color: #c9b87a; margin: 6px 0 18px; white-space: pre-wrap; }
+  #status { min-height: 22px; color: #c9b87a; margin: 6px 0 6px; white-space: pre-wrap; }
+  #progress { display: none; align-items: center; gap: 10px; margin: 0 0 18px; }
+  #progress.on { display: flex; }
+  #progress .pb { flex: 1; height: 8px; background: #1f2229; border-radius: 4px; overflow: hidden; position: relative; }
+  #progress .fill { height: 100%; width: 0; background: #c9b87a; transition: width .2s; }
+  #progress.busy .fill { width: 30% !important; position: absolute; animation: slide 1.1s infinite ease-in-out; }
+  @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
+  #progress .pct { color: #8f8a7e; font-size: 13px; min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
   .places { display: flex; flex-direction: column; gap: 8px; }
   .card { display: flex; align-items: center; gap: 12px; background: #13151a; border: 1px solid #2a2d36; border-radius: 6px; padding: 10px 14px; }
   .card .name { flex: 1; } .card .name b { display: block; } .card .name span { color: #8f8a7e; font-size: 13px; }
@@ -81,6 +88,7 @@
       <button id="go" class="primary">Go there</button>
     </div>
     <div id="status"></div>
+    <div id="progress"><div class="pb"><div class="fill"></div></div><div class="pct"></div></div>
     <div class="section" style="color:#e8dcc2;font-weight:600;margin-bottom:8px">Places</div>
     <div id="places" class="places"></div>
     <div class="note">
