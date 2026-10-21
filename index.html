@@ -67,6 +67,12 @@
   .av-custom label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: #a9a496; }
   .av-custom select { width: 130px; padding: 4px 6px; }
   #av-preview { width: 96px; height: 96px; image-rendering: pixelated; align-self: center; background: #3f6b35; border-radius: 6px; }
+  #side .quest { color: #d9c88a; font-size: 13px; margin: -2px 0 6px; }
+  .qlist { display: flex; flex-direction: column; gap: 8px; }
+  .qrow { display: grid; grid-template-columns: 1fr 70px; grid-template-areas: "t n" "x n" "b n"; gap: 2px 10px; align-items: center; }
+  .qrow b { grid-area: t; color: #e8dcc2; } .qrow > .muted { grid-area: x; font-size: 12px; } .qrow .bar { grid-area: b; } .qrow .num { grid-area: n; text-align: right; color: #a9a496; font-size: 13px; }
+  .qrow.done b { color: #7fa37a; text-decoration: line-through; }
+  .trow { display: flex; justify-content: space-between; border-bottom: 1px solid #262930; padding: 3px 0; } .trow b { color: #e8dcc2; }
   #side .avatar { width: 20px; height: 20px; image-rendering: pixelated; vertical-align: middle; margin-right: 2px; }
   #overlay h2 { margin: 0 0 10px; font-family: Georgia, serif; color: #e8dcc2; }
   #overlay kbd { background: #23262e; padding: 1px 6px; border-radius: 3px; font-family: monospace; }
@@ -110,6 +116,7 @@
   <script src="js/osm.js"></script>
   <script src="js/store.js"></script>
   <script src="js/world.js"></script>
+  <script src="js/quests.js"></script>
   <script src="js/game.js"></script>
   <script src="js/sprites.js"></script>
   <script src="js/render.js"></script>

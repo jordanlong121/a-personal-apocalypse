@@ -58,13 +58,30 @@ out geom;`;
     return [lat - dLat, lon - dLon, lat + dLat, lon + dLon]; // s, w, n, e
   }
 
+  // Overpass streams its answer without a length, so first ask it how many elements match: a cheap count query.
+  // About 680 bytes per element in practice (ways carry their geometry), which gives a usable size estimate.
+  const BYTES_PER_ELEMENT = 680;
+  async function countOverpass(url, bbox) {
+    const q = overpassQuery(bbox).replace(/out geom;\s*$/, 'out count;').replace('[timeout:120]', '[timeout:60]');
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60000);
+    const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error('count HTTP ' + res.status);
+    const j = await res.json();
+    const t = j.elements && j.elements[0] && j.elements[0].tags;
+    return t ? parseInt(t.total || t.nodes || '0', 10) : 0;
+  }
+
   async function fetchOverpass(bbox, onStatus, onProgress) {
     const body = 'data=' + encodeURIComponent(overpassQuery(bbox));
     let lastErr = null;
     for (const url of OVERPASS_MIRRORS) {
       const host = new URL(url).host;
       try {
-        if (onStatus) onStatus('Downloading map data from ' + host + ' …');
+        if (onStatus) onStatus('Asking ' + host + ' how big the map is …');
+        let estimate = 0;
+        for (let attempt = 0; attempt < 2 && !estimate; attempt++) { try { estimate = (await countOverpass(url, bbox)) * BYTES_PER_ELEMENT; } catch (e) { await new Promise(r => setTimeout(r, 2500)); } }
+        if (onStatus) onStatus('Downloading map data from ' + host + (estimate ? ' (about ' + (estimate / 1048576).toFixed(1) + ' MB) …' : ' …'));
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 150000);
         const res = await fetch(url, {
@@ -77,6 +94,7 @@ out geom;`;
         if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + host);
         // Stream the body so the caller can show how much has come down (Overpass rarely sends a length).
         const total = parseInt(res.headers.get('Content-Length') || '0', 10) || 0;
+        const exact = total > 0;
         let text;
         if (res.body && res.body.getReader) {
           const reader = res.body.getReader(), chunks = []; let got = 0;
@@ -84,7 +102,7 @@ out geom;`;
             const { done, value } = await reader.read();
             if (done) break;
             chunks.push(value); got += value.length;
-            if (onProgress) onProgress(got, total);
+            if (onProgress) onProgress(got, exact ? total : estimate, exact);
           }
           const all = new Uint8Array(got); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
           text = new TextDecoder().decode(all);

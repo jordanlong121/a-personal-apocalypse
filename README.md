@@ -32,6 +32,9 @@ All on-screen text is written flat and spare, after Cormac McCarthy's The Road.
 - Walk into a fridge, shelf, locker or car to search it. `g` searches whatever is beside you. `u` then a letter uses an item (eat, drink, heal, wield).
 - `F` then a direction fires a wielded ranged weapon (bow 8, shotgun 6, pistol 10, rifle 16 tiles). Guns are loud.
 - Doors start closed: walk into one to open it, `c` + direction closes it. Alert zombies pound on closed doors for many turns before they break through.
+- They come in kinds: walkers, runners (two steps a turn, see farther), brutes (rare, 14+ health, hit like a car, batter walls four times as fast; one leads any big horde), spitters (hit you from up to five tiles), howlers (call every zombie within 22 tiles when they see you, and scream when they die). See `ZTYPES` in `js/game.js`.
+- `q` lists the quests, `x` the tally: kills by kind, paces walked, things taken, places searched, shots, doors, windows, blood lost, hordes, nights survived.
+- Quests live in `js/quests.js`: each has an id, title, text and a `goal(game)` returning `{cur, max}`. Three placeholders are there to fill in. Done quests are saved and announced in the log; the sidebar shows the next one.
 - Windows: walk into one to smash it and climb through. Hordes roam in occasionally and will batter down doors, windows and eventually walls.
 - `d` + letter drops. `.` waits. `m` overview map. `S` saves. `Esc` quits to the title (autosaves).
 - Food and water drain over time. Below a quarter of your health you stagger: 25% of steps go astray at a quarter, 90% at a tenth. At night zombies notice you from less far away.
@@ -73,7 +76,8 @@ Saves store only the seed plus what changed, so they are a few kilobytes.
 - `js/osm.js` — geocode, Overpass fetch, compaction (also used by the bundle tool)
 - `js/store.js` — IndexedDB for places, localStorage for saves
 - `js/world.js` — chunk generation and building interiors
-- `js/game.js` — rules, items, zombies, save/load
+- `js/game.js` — rules, items, zombie kinds, stats, save/load
+- `js/quests.js` — the goal list (edit this to write quests)
 - `js/sprites.js` — embedded 12×12 pixel-art sprites (people, containers, doors, trees)
 - `js/render.js` — canvas view, overview map, sidebar
 - `js/main.js` — title screen and input

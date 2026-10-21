@@ -85,6 +85,34 @@
       '...GG..GG...',
       '...kk..kk...',
     ],
+    brute: [
+      '...hhhhhh...',
+      '..hhhhhhhh..',
+      '..zzzzzzzz..',
+      '..zRzzzzRz..',
+      '..zzzZZzzz..',
+      'zzzttttttzzz',
+      'zzttttttttzz',
+      'zzttZttZttzz',
+      '.ztttttttt z',
+      '..GGG..GGG..',
+      '..GGG..GGG..',
+      '..kkk..kkk..',
+    ],
+    brute_alert: [
+      '...hhhhhh...',
+      '..hhhhhhhh..',
+      '..zzzzzzzz..',
+      '..zrzzzzrz..',
+      '..zzzZZzzz..',
+      'zzzttttttzzz',
+      'zzttttttttzz',
+      'zzttZttZttzz',
+      '.ztttttttt z',
+      '..GGG..GGG..',
+      '..GGG..GGG..',
+      '..kkk..kkk..',
+    ],
     fridge: [
       '..kkkkkkkk..',
       '..kwwwwwwk..',
@@ -601,7 +629,8 @@
   const cache = new Map();
 
   // Colour variants: 'car_top|r' swaps the body letters u/U for r/R.
-  const VARIANTS = { r: { u: 'r', U: 'R' }, w: { u: 'W', U: 'g' }, g: { u: 'G', U: 'm' }, y: { u: 'y', U: 'o' }, e: { u: 'e', U: 'E' } };
+  const VARIANTS = { r: { u: 'r', U: 'R' }, w: { u: 'W', U: 'g' }, g: { u: 'G', U: 'm' }, y: { u: 'y', U: 'o' }, e: { u: 'e', U: 'E' },
+    runner: { t: 'x', z: 'Z', h: 'k' }, spitter: { z: 'c', Z: 'e', t: 'E', h: 'E' }, howler: { z: 'W', Z: 'g', t: 'm', h: 'W' } };
   function render(name) {
     const [base, vkey] = name.split('|');
     const rows = DEF[base];

@@ -57,10 +57,10 @@
       setStatus('There it is. ' + g.name);
       const bbox = OSM.bboxAround(g.lat, g.lon, radius);
       setProgress('waiting on the map', null);
-      const raw = await OSM.fetchOverpass(bbox, setStatus, (got, total) => {
-        const mb = (got / 1048576).toFixed(1) + ' MB';
-        if (total) setProgress(mb + ' of ' + (total / 1048576).toFixed(1) + ' MB', got / total);
-        else setProgress(mb + ' · ' + Math.round((Date.now() - t0) / 1000) + 's', null);
+      const raw = await OSM.fetchOverpass(bbox, setStatus, (got, total, exact) => {
+        const mb = v => (v / 1048576).toFixed(1);
+        if (total) setProgress(mb(got) + ' of ' + (exact ? '' : 'about ') + mb(total) + ' MB', Math.min(0.99, got / total));
+        else setProgress(mb(got) + ' MB · ' + Math.round((Date.now() - t0) / 1000) + 's', null);
       });
       setStatus('Laying the town out. ' + raw.elements.length + ' pieces of it.'); setProgress('laying it out', null);
       await new Promise(r => setTimeout(r, 20));
@@ -221,7 +221,7 @@
     const p = game.player;
     overlayBox.innerHTML = `<h2>Then nothing.</h2>
       <div>The ${escapeHtml(game.className().toLowerCase())} lasted ${game.day() - 1} day${game.day() - 1 === 1 ? '' : 's'} in ${escapeHtml(game.place.name.split(',')[0])}.</div>
-      <div>${p.kills} of them put down. ${p.looted} places gone through.</div>
+      <div>${p.kills} of them put down. ${p.looted} places gone through. ${p.stats ? p.stats.distance + ' paces. ' + p.stats.items + ' things taken. ' + Object.keys(game.player.quests.done).length + ' things done.' : ''}</div>
       <div class="muted" style="margin-top:10px">The save is gone. It doesnt come back. <kbd>Enter</kbd> or <kbd>Esc</kbd>.</div>`;
     overlay.classList.add('on');
   }
@@ -236,6 +236,7 @@
       <div>The cars are still in the streets and piled up on the highways. The houses keep their roofs until you are inside.</div>
       <div>Now and then they come in numbers. You will hear it first. They come straight on and they will take a door, a window, and in time a wall.</div>
       <div><kbd>F</kbd> and a direction fires what is in your hands, in a line. The bow reaches 8 and is quiet. Shotgun 6. Pistol 10. Rifle 16. Guns carry. Rounds go in a pouch and dont take pack room.</div>
+      <div><kbd>q</kbd> is what there is to do. <kbd>x</kbd> is the tally of what you have done. They come in kinds now: walkers, runners that outpace you, howlers that call the rest, spitters that reach you from across the room, and brutes that go through walls.</div>
       <div><kbd>.</kbd> or <kbd>space</kbd> waits. <kbd>m</kbd> is the map. <kbd>S</kbd> writes it down. <kbd>Esc</kbd> goes back to the title and writes it down on the way.</div>
       <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The clock on the wall is your clock: it is the same time in here as it is where you sit, and the sun goes down when yours does. The weather is whatever the weather is there, when the net is on. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. Under a quarter of it you stagger, and the lower it goes the less your steps are your own. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
       <div class="muted">On the map. Gold is food. Red is medicine. Blue is tools. Purple is guns. Orange is gas.</div>
@@ -243,6 +244,25 @@
     overlay.classList.add('on');
   }
 
+  function showQuests() {
+    mode = 'help';
+    const rows = game.questList().map(q => `<div class="qrow${q.done ? ' done' : ''}"><b>${escapeHtml(q.title)}</b><span class="muted">${escapeHtml(q.text)}</span><div class="bar"><div style="width:${Math.round(100 * q.cur / q.max)}%;background:${q.done ? '#5fbf6a' : '#c9b87a'}"></div></div><span class="num">${q.done ? 'done' : q.cur + ' / ' + q.max}</span></div>`).join('');
+    overlayBox.innerHTML = `<h2>What there is to do.</h2><div class="qlist">${rows}</div><div class="muted" style="margin-top:10px">Any key.</div>`;
+    overlay.classList.add('on');
+  }
+  function showTally() {
+    mode = 'help';
+    const s = game.player.stats, k = s.kills || {};
+    const kills = Object.keys(ZTYPES).map(t => (k[t] || 0) + ' ' + t + (k[t] === 1 ? '' : 's')).join(' · ');
+    const row = (a, b) => `<div class="trow"><span>${a}</span><b>${b}</b></div>`;
+    overlayBox.innerHTML = `<h2>The tally.</h2>
+      ${row('Days', game.day())}${row('Nights lived through', s.nights)}${row('Paces', s.distance)}${row('Put down', Object.values(k).reduce((x, y) => x + y, 0))}
+      <div class="muted" style="margin:-4px 0 6px">${kills}</div>
+      ${row('Shots fired', s.shots)}${row('Places gone through', s.searched)}${row('Things taken', s.items)}${row('Eaten', s.eaten)}${row('Drunk', s.drunk)}${row('Wounds bound', s.healed)}
+      ${row('Doors opened', s.doors)}${row('Windows broken', s.windows)}${row('Blood lost', s.hurt)}${row('Hordes', s.hordes)}
+      <div class="muted" style="margin-top:10px">Any key.</div>`;
+    overlay.classList.add('on');
+  }
   function closeOverlay() { overlay.classList.remove('on'); mode = 'play'; render(); focusGame(); }
 
   const MOVE_KEYS = {
@@ -307,6 +327,8 @@
     if (k === 'd') { dropPending = true; game.log('Leave what.'); render(); e.preventDefault(); return; }
     if (k === 'u') { if (!game.player.inv.length) { game.log('Nothing in the pack.'); } else { usePending = true; game.log('Use what.'); } render(); e.preventDefault(); return; }
     if (k === 'm') { mode = 'map'; render(); e.preventDefault(); return; }
+    if (k === 'q') { showQuests(); e.preventDefault(); return; }
+    if (k === 'x') { showTally(); e.preventDefault(); return; }
     if (k === 'S') { const ok = Store.putSave(game.place.id, game.serialize()); game.log(ok ? 'Written down.' : 'It wouldnt write. The browser is keeping nothing.'); render(); e.preventDefault(); return; }
     if (k === '?') { showHelp(); e.preventDefault(); return; }
     if (k === 'Escape') { quit(); e.preventDefault(); return; }

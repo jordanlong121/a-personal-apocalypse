@@ -397,7 +397,8 @@
       for (const z of game.zombies) {
         const c = z.x - ox, r = z.y - oy;
         if (c < 0 || r < 0 || c >= cols || r >= rows || !game.visible(z.x, z.y)) continue;
-        SP.draw(ctx, z.alert ? 'zombie_alert' : 'zombie', c * ts, r * ts, ts);
+        const base = z.type === 'brute' ? (z.alert ? 'brute_alert' : 'brute') : (z.alert ? 'zombie_alert' : 'zombie') + (z.type && z.type !== 'walker' && z.type !== 'brute' ? '|' + z.type : '');
+        SP.draw(ctx, base, c * ts, r * ts, ts);
       }
       ctx.drawImage(SP.avatar(game.player.avatar), (px - ox) * ts, (py - oy) * ts, ts, ts);
 
@@ -521,6 +522,7 @@
         <div class="place">${escapeHtml(game.place.name.split(',').slice(0, 2).join(','))}</div>
         <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr}</div>
         <div class="where">${escapeHtml(where)}</div>
+        ${(() => { const q = game.currentQuest(); return q ? `<div class="quest">${escapeHtml(q.title)} <span class="muted">${q.max > 1 ? q.cur + '/' + q.max : ''} · q for all</span></div>` : '<div class="quest muted">Nothing left to do but live.</div>'; })()}
         <div class="stat"><span>Body</span>${bar(100 * p.hp / (p.hpMax || 100), p.hp > 40 ? '#5fbf6a' : '#d44')}<span class="num">${p.hp}</span></div>
         <div class="stat"><span>Food</span>${bar(p.hunger, p.hunger > 25 ? '#d9a441' : '#d44')}<span class="num">${p.hunger}</span></div>
         <div class="stat"><span>Water</span>${bar(p.thirst, p.thirst > 25 ? '#5a9bd8' : '#d44')}<span class="num">${p.thirst}</span></div>
@@ -531,7 +533,7 @@
         <div class="inv">${inv}</div>
         <div class="section">What happened</div>
         <div class="log">${msgs}</div>
-        <div class="help muted">move: arrows / numpad · u use · g search beside you · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
+        <div class="help muted">move: arrows / numpad · u use · g search beside you · q quests · x tally · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
     }
 
     drawMap(game) {

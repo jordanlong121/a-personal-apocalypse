@@ -97,6 +97,16 @@
   const CONTAINER_NAME = { fridge: 'fridge', freezer: 'freezer', cupboard: 'cupboard', closet: 'closet', dresser: 'dresser', shelf: 'shelf',
     cabinet: 'cabinet', desk: 'desk', toolbox: 'toolbox', crate: 'crate', locker: 'locker', car: 'abandoned car', wreck: 'burnt-out car' };
 
+  // Zombie kinds, loosely after Left 4 Dead. speed: moves per turn. bash: hits per pound on a barrier.
+  const ZTYPES = {
+    walker:  { name: 'walker',  hp: [3, 5],   dmg: [3, 8],   hit: 0.65, speed: 1,   stumble: 0.22, bash: 1, weight: 70, sight: 0 },
+    runner:  { name: 'runner',  hp: [2, 3],   dmg: [2, 5],   hit: 0.6,  speed: 2,   stumble: 0.05, bash: 1, weight: 14, sight: 2 },
+    brute:   { name: 'brute',   hp: [14, 18], dmg: [8, 14],  hit: 0.7,  speed: 0.5, stumble: 0.1,  bash: 4, weight: 2,  sight: 0 },
+    spitter: { name: 'spitter', hp: [3, 4],   dmg: [2, 4],   hit: 0.65, speed: 1,   stumble: 0.25, bash: 1, weight: 6,  sight: 0, spit: 5 },
+    howler:  { name: 'howler',  hp: [2, 4],   dmg: [2, 5],   hit: 0.6,  speed: 1,   stumble: 0.2,  bash: 1, weight: 8,  sight: 1, howl: 22 },
+  };
+  const ZSEEN = { walker: 'One of them. Slow, and not alone.', runner: 'This one is fast. Faster than you.', brute: 'Something big. It does not shamble. It comes.',
+    spitter: 'Its jaw hangs wrong and something drips from it.', howler: 'Its mouth is open wider than a mouth should go.' };
   const DOOR_HP = 10;          // pounding turns (at 70% per zombie per turn) before a door gives way
   const BARRIER_HP = { [T.DOOR]: DOOR_HP, [T.WINDOW]: 3, [T.WALL]: 60 };
   const HORDE_MIN_GAP = 500;   // turns between hordes at minimum
@@ -115,7 +125,9 @@
       this.nextId = 1;
       this.dead = false;
       this.rng = mulberry32((this.seed ^ 0xA5A5A5A5) >>> 0);
-      this.player = { x: 0, y: 0, hp: 100, hpMax: 100, hunger: 100, thirst: 100, inv: [], ammo: {}, weapon: null, kills: 0, looted: 0, cls: null, avatar: null };
+      this.player = { x: 0, y: 0, hp: 100, hpMax: 100, hunger: 100, thirst: 100, inv: [], ammo: {}, weapon: null, kills: 0, looted: 0, cls: null, avatar: null,
+        stats: { kills: {}, distance: 0, items: 0, searched: 0, shots: 0, doors: 0, windows: 0, hurt: 0, hordes: 0, nights: 0, eaten: 0, drunk: 0, healed: 0 },
+        quests: { done: {} } };
       this.lastShot = null;
       this.doors = new Map(); // 'x,y' -> { t: tile state, hp } for doors/windows/walls that changed from their generated state
       this.lastHorde = 0;
@@ -215,10 +227,28 @@
       }
     }
 
-    addZombie(x, y, rng, hp) {
-      const z = { id: this.nextId++, x, y, hp: hp || (3 + Math.floor((rng || this.rng)() * 3)), alert: false, tx: 0, ty: 0, ttl: 0 };
+    addZombie(x, y, rng, hp, type) {
+      const r = rng || this.rng;
+      if (!type) type = this.pickZombieType(r, false);
+      const T0 = ZTYPES[type] || ZTYPES.walker;
+      const z = { id: this.nextId++, x, y, type, hp: hp || (T0.hp[0] + Math.floor(r() * (T0.hp[1] - T0.hp[0] + 1))), alert: false, tx: 0, ty: 0, ttl: 0, seen: false, lastHowl: -99 };
       this.zombies.push(z); this.zmap.set(x + ',' + y, z);
       return z;
+    }
+    pickZombieType(rng, horde) {
+      const w = horde ? { walker: 50, runner: 38, howler: 6, spitter: 6 } : { walker: 70, runner: 14, brute: 2, spitter: 6, howler: 8 };
+      let r = rng() * Object.values(w).reduce((a, b) => a + b, 0);
+      for (const [k, v] of Object.entries(w)) { r -= v; if (r <= 0) return k; }
+      return 'walker';
+    }
+    ztype(z) { return ZTYPES[z.type] || ZTYPES.walker; }
+    killZombie(z, how) {
+      this.zombies.splice(this.zombies.indexOf(z), 1); this.zmap.delete(z.x + ',' + z.y);
+      this.player.kills++;
+      const st = this.player.stats; st.kills[z.type || 'walker'] = (st.kills[z.type || 'walker'] || 0) + 1;
+      if (z.type === 'howler') { this.noise(z.x, z.y, 14); this.log('It dies screaming. The scream goes a long way.'); }
+      else if (z.type === 'brute') this.log('The big one goes down. The ground takes it like a dropped engine.' + (how ? ' ' + how : ''));
+      else this.log('It goes down and doesnt get up.' + (how ? ' ' + how : ''));
     }
 
     // ---- helpers ---------------------------------------------------------------
@@ -366,6 +396,25 @@
       return best;
     }
 
+    // ---- quests ------------------------------------------------------------------
+    questList() {
+      const Q = global.QUESTS || [], out = [];
+      for (const q of Q) {
+        let pr; try { pr = q.goal(this) || { cur: 0, max: 1 }; } catch (e) { pr = { cur: 0, max: 1 }; }
+        const done = !!this.player.quests.done[q.id];
+        out.push({ id: q.id, title: q.title, text: q.text, cur: done ? pr.max : Math.min(pr.cur, pr.max), max: pr.max, done });
+      }
+      return out;
+    }
+    checkQuests() {
+      for (const q of this.questList()) {
+        if (q.done || q.cur < q.max) continue;
+        this.player.quests.done[q.id] = this.turn;
+        this.log('Done. ' + q.title + '.');
+      }
+    }
+    currentQuest() { return this.questList().find(q => !q.done) || null; }
+
     // ---- weather -----------------------------------------------------------------
     updateWeather() {
       const w = this.weather;
@@ -409,12 +458,13 @@
         const x = cx + Math.floor(this.rng() * (2 * r + 1)) - r, y = cy + Math.floor(this.rng() * (2 * r + 1)) - r;
         if (!this.world.passable(x, y) || this.zmap.has(x + ',' + y) || this.world.buildingIdxAt(x, y) >= 0) continue;
         if (Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) < 18) continue;
-        const z = this.addZombie(x, y, null, 3 + Math.floor(this.rng() * 3));
+        const type = placed === 0 && n >= 10 ? 'brute' : this.pickZombieType(this.rng, true);
+        const z = this.addZombie(x, y, null, 0, type);
         z.horde = true; z.alert = true; z.tx = p.x; z.ty = p.y; z.ttl = 90;
         placed++;
       }
       if (!placed) return;
-      this.lastHorde = this.turn;
+      this.lastHorde = this.turn; this.player.stats.hordes++;
       const dirs = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
       const dir = dirs[Math.round(((ang + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
       this.log('A sound from the ' + dir + ' like wind in a culvert. Many of them. Coming.');
@@ -455,8 +505,8 @@
       const z = this.zombieAt(x, y);
       if (z) { this.attack(z); return true; }
       const bt = this.world.tileAt(x, y);
-      if (bt === T.DOOR) { this.setDoor(x, y, T.DOOR_OPEN); this.log('The door gives. You go in.'); return true; }
-      if (bt === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); this.noise(x, y, 8); this.log('The glass goes. The sound carries a long way in the quiet.'); return true; }
+      if (bt === T.DOOR) { this.setDoor(x, y, T.DOOR_OPEN); this.player.stats.doors++; this.log('The door gives. You go in.'); return true; }
+      if (bt === T.WINDOW) { this.setDoor(x, y, T.WINDOW_BROKEN, 0); this.noise(x, y, 8); this.player.stats.windows++; this.log('The glass goes. The sound carries a long way in the quiet.'); return true; }
       if (bt === T.CAR) { const car = this.world.carAt(x, y); if (car) return this.searchContainer(car); }
       if (bt === T.OBJ) { const c = this.world.containerAt(x, y); if (c) return this.searchContainer(c); }
       if (!this.world.passable(x, y) || this.cornerBlocked(this.player.x, this.player.y, dx, dy)) {
@@ -464,7 +514,7 @@
         if (t === T.WATER) this.log('Black water. You dont go in.');
         return false;
       }
-      this.player.x = x; this.player.y = y;
+      this.player.x = x; this.player.y = y; this.player.stats.distance++;
       return true;
     }
 
@@ -475,11 +525,8 @@
       if (this.rng() < w.hit) {
         const dmg = w.dmg + this.perk('melee', 0) + (this.rng() < 0.25 ? 1 : 0);
         z.hp -= dmg;
-        if (z.hp <= 0) {
-          this.zombies.splice(this.zombies.indexOf(z), 1); this.zmap.delete(z.x + ',' + z.y);
-          this.player.kills++;
-          this.log('It goes down and doesnt get up. The ' + w.name.toLowerCase() + '.');
-        } else this.log('The ' + w.name.toLowerCase() + ' lands. ' + dmg + '.');
+        if (z.hp <= 0) this.killZombie(z, 'The ' + w.name.toLowerCase() + '.');
+        else this.log('The ' + w.name.toLowerCase() + ' lands. ' + dmg + '.' + (z.type === 'brute' ? ' It hardly notices.' : ''));
       } else this.log('You swing at it. Air.');
     }
 
@@ -489,7 +536,7 @@
       if (!w.ranged) { this.log('Nothing in your hands that will reach that far.'); return false; }
       const have = this.player.ammo[w.ammo] || 0;
       if (have <= 0) { this.log('No ' + ITEMS[w.ammo].short + '. You check again anyway.'); return false; }
-      this.player.ammo[w.ammo] = have - 1;
+      this.player.ammo[w.ammo] = have - 1; this.player.stats.shots++;
       let x = this.player.x, y = this.player.y, target = null, dist = 0;
       for (let i = 1; i <= w.range; i++) {
         const nx = x + dx, ny = y + dy;
@@ -506,11 +553,8 @@
       if (this.rng() < hitChance) {
         const dmg = w.dmg + (this.rng() < 0.25 ? 1 : 0);
         target.hp -= dmg;
-        if (target.hp <= 0) {
-          this.zombies.splice(this.zombies.indexOf(target), 1); this.zmap.delete(target.x + ',' + target.y);
-          this.player.kills++;
-          this.log('It drops at ' + dist + ' paces and lies there.');
-        } else this.log('Hit, at ' + dist + ' paces. ' + dmg + '. It keeps coming.');
+        if (target.hp <= 0) this.killZombie(target, 'At ' + dist + ' paces.');
+        else this.log('Hit, at ' + dist + ' paces. ' + dmg + '. It keeps coming.');
       } else this.log('The shot goes wide.');
       return true;
     }
@@ -529,7 +573,7 @@
       if (c.opened) { this.log('Youve been through this already.'); return false; }
       if (c.items === null) c.items = this.rollLoot(c);
       c.opened = true;
-      this.player.looted++;
+      this.player.looted++; this.player.stats.searched++;
       if (!c.items.length) { this.log('Nothing. Someone was here before you.'); return true; }
       const got = [], left = [];
       for (const entry of c.items) {
@@ -537,6 +581,7 @@
         if (ITEMS[id].cat === 'ammo') { const n = parseInt(qty || '1', 10); this.player.ammo[id] = (this.player.ammo[id] || 0) + n; got.push(n + ' ' + ITEMS[id].short); continue; }
         if (this.player.inv.length >= INV_MAX) left.push(entry); else { this.player.inv.push(id); got.push(ITEMS[id].name); }
       }
+      this.player.stats.items += got.length;
       if (got.length) this.log('In the ' + CONTAINER_NAME[c.kind] + ': ' + got.join(', ').toLowerCase() + '. You take ' + (got.length > 1 ? 'them' : 'it') + '.');
       if (left.length) { this.log('The pack wont take any more. You leave ' + left.map(i => ITEMS[i.split('*')[0]].name.toLowerCase()).join(', ') + '.'); c.items = left; c.opened = false; }
       else c.items = [];
@@ -571,12 +616,12 @@
           const fm = this.perk('foodMult', 1);
           p.hunger = Math.max(0, Math.min(100, p.hunger + Math.round((it.hunger || 0) * ((it.hunger || 0) > 0 ? fm : 1))));
           p.thirst = Math.max(0, Math.min(100, p.thirst + Math.round((it.thirst || 0) * ((it.thirst || 0) > 0 ? fm : 1))));
-          p.inv.splice(idx, 1);
+          p.inv.splice(idx, 1); if (it.cat === 'food') p.stats.eaten++; else p.stats.drunk++;
           this.log(it.cat === 'food' ? 'You eat the ' + it.name.toLowerCase() + ' cold, standing up.' : 'You drink the ' + it.name.toLowerCase() + '. It helps.');
           return true;
         case 'med':
           if (p.hp >= p.hpMax) { this.log('Youre not hurt. Not that way.'); return false; }
-          p.hp = Math.min(p.hpMax, p.hp + Math.round(it.heal * this.perk('medMult', 1))); p.inv.splice(idx, 1);
+          p.hp = Math.min(p.hpMax, p.hp + Math.round(it.heal * this.perk('medMult', 1))); p.inv.splice(idx, 1); p.stats.healed++;
           this.log('You bind it as best you can. ' + p.hp + '.');
           return true;
         case 'weapon':
@@ -598,7 +643,7 @@
     }
 
     hurt(amount) {
-      this.player.hp -= amount;
+      this.player.hp -= amount; this.player.stats.hurt += amount;
       this.hurtTime = Date.now();
       this.hurtAmount = amount;
     }
@@ -624,6 +669,10 @@
       this.maybeSpawnHorde();
       this.zombiesAct();
       this.computeFov();
+      const ph = this.phase();
+      if (this.lastPhase === 'night' && ph === 'dawn' && p.hp > 0) { p.stats.nights++; this.log('Light. You are still here.'); }
+      this.lastPhase = ph;
+      this.checkQuests();
       const low = 100 * p.hp / (p.hpMax || 100) <= 25;
       if (low && !this.wasLow && p.hp > 0) this.log('You are losing too much blood. Your legs are not yours anymore.');
       this.wasLow = low;
@@ -633,14 +682,30 @@
     zombiesAct() {
       const p = this.player;
       for (const z of this.zombies.slice()) {
+        const zt = this.ztype(z);
+        const steps = zt.speed >= 1 ? zt.speed : (this.turn % 2 === 0 ? 1 : 0);
+        for (let s = 0; s < steps; s++) { if (!this.zombies.includes(z) || this.dead) break; if (!this.zombieStep(z, zt, s)) break; }
+      }
+    }
+    // One action for zombie z. Returns false if it should not act again this turn.
+    zombieStep(z, zt, s) {
+      const p = this.player;
+      {
         const dx = p.x - z.x, dy = p.y - z.y, ad = Math.abs(dx), bd = Math.abs(dy);
-        if (ad > 40 || bd > 40) continue; // dormant far away
+        if (ad > 40 || bd > 40) return false; // dormant far away
         const dist = Math.max(ad, bd);
-        const seesPlayer = dist <= Math.max(2, (this.isNight() ? 6 : 10) - this.perk('stealth', 0) - (this.weather.k === 'fog' ? 3 : 0)) && this.los(z.x, z.y, p.x, p.y);
+        const seesPlayer = dist <= Math.max(2, (this.isNight() ? 6 : 10) + zt.sight - this.perk('stealth', 0) - (this.weather.k === 'fog' ? 3 : 0)) && this.los(z.x, z.y, p.x, p.y);
         if (seesPlayer || dist <= 1) { z.alert = true; z.tx = p.x; z.ty = p.y; z.ttl = 25; }
-        if (dist <= 1) { this.zombieAttack(z); continue; }
+        if (seesPlayer && !z.seen && this.visible(z.x, z.y)) { z.seen = true; this.log(ZSEEN[z.type] || ZSEEN.walker); }
+        if (seesPlayer && zt.howl && this.turn - z.lastHowl > 15) { z.lastHowl = this.turn; this.noise(z.x, z.y, zt.howl); this.log('It throws its head back and howls. Everything hears it.'); return false; }
+        if (zt.spit && seesPlayer && dist >= 2 && dist <= zt.spit && s === 0 && this.rng() < 0.35) {
+          const dmg = zt.dmg[0] + Math.floor(this.rng() * (zt.dmg[1] - zt.dmg[0] + 1));
+          this.hurt(dmg); this.log('Something wet and burning hits you across ' + dist + ' paces. ' + dmg + '.');
+          return false;
+        }
+        if (dist <= 1) { if (s === 0) this.zombieAttack(z); return false; }
         if (z.alert) {
-          if (this.rng() < 0.22) continue; // shambling
+          if (this.rng() < zt.stumble) return false; // shambling
           // If a building wall separates the zombie from its target, head for that building's nearest door.
           let tx = z.tx, ty = z.ty;
           const zb = this.world.buildingIdxAt(z.x, z.y), pb = this.world.buildingIdxAt(z.tx, z.ty);
@@ -656,14 +721,14 @@
                 if (!ddx && !ddy) continue;
                 if (this.world.isBarrierOf(z.x + ddx, z.y + ddy, bidx)) { hit = [z.x + ddx, z.y + ddy]; break; }
               }
-              if (hit) { z.ttl = Math.max(z.ttl, 20); this.bashDoor(z, hit[0], hit[1]); continue; }
+              if (hit) { z.ttl = Math.max(z.ttl, 20); for (let b = 0; b < zt.bash; b++) this.bashDoor(z, hit[0], hit[1]); return false; }
             } else {
               const doors = this.world.buildingDoors(bidx);
               let door = null, dd = Infinity;
               for (const d of doors) { const dist2 = (d[0] - z.x) ** 2 + (d[1] - z.y) ** 2; if (dist2 < dd) { dd = dist2; door = d; } }
               if (door && !(door[0] === z.x && door[1] === z.y)) {
                 const adj = Math.max(Math.abs(door[0] - z.x), Math.abs(door[1] - z.y)) <= 1;
-                if (adj && this.world.tileAt(door[0], door[1]) === T.DOOR) { z.ttl = Math.max(z.ttl, 12); this.bashDoor(z, door[0], door[1]); continue; }
+                if (adj && this.world.tileAt(door[0], door[1]) === T.DOOR) { z.ttl = Math.max(z.ttl, 12); for (let b = 0; b < zt.bash; b++) this.bashDoor(z, door[0], door[1]); return false; }
                 tx = door[0]; ty = door[1];
               }
             }
@@ -675,16 +740,18 @@
               for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
                 if (this.world.isBarrierOf(z.x + ddx, z.y + ddy, zb >= 0 ? zb : pb)) { hit = [z.x + ddx, z.y + ddy]; break; }
               }
-              if (hit) { z.ttl = Math.max(z.ttl, 20); this.bashDoor(z, hit[0], hit[1]); continue; }
+              if (hit) { z.ttl = Math.max(z.ttl, 20); for (let b = 0; b < zt.bash; b++) this.bashDoor(z, hit[0], hit[1]); return false; }
             }
             z.ttl -= 3;
           }
           if (z.x === z.tx && z.y === z.ty) z.ttl = 0;
           if (--z.ttl <= 0) z.alert = false;
+          return true;
         } else if (this.rng() < 0.3) {
           const d = DIRS[[1, 2, 3, 4, 6, 7, 8, 9][Math.floor(this.rng() * 8)]];
           this.tryStep(z, z.x + d[0], z.y + d[1]);
         }
+        return false;
       }
     }
 
@@ -709,10 +776,11 @@
       return true;
     }
     zombieAttack(z) {
-      if (this.rng() < 0.65) {
-        const dmg = 3 + Math.floor(this.rng() * 6);
+      const zt = this.ztype(z);
+      if (this.rng() < zt.hit) {
+        const dmg = zt.dmg[0] + Math.floor(this.rng() * (zt.dmg[1] - zt.dmg[0] + 1));
         this.hurt(dmg);
-        this.log('It gets its teeth in you. ' + dmg + '.');
+        this.log((z.type === 'brute' ? 'It hits you like a car. ' : 'It gets its teeth in you. ') + dmg + '.');
       } else this.log('It comes at you and finds nothing.');
     }
 
@@ -727,13 +795,15 @@
       }
       const doors = [...this.doors].map(([k, d]) => [...k.split(',').map(Number), d.t, d.hp]);
       return { v: 1, placeId: this.place.id, seed: this.seed, turn: this.turn, player: this.player, nextId: this.nextId, doors,
-        zombies: this.zombies.map(z => ({ x: z.x, y: z.y, hp: z.hp, h: z.horde ? 1 : 0 })), lastHorde: this.lastHorde, weather: this.weather.live ? { k: this.weather.k, until: this.turn } : this.weather, snow: this.snow, startedAt: this.startedAt, spawned, looted, seen, msgs: this.msgs.slice(-10), saved: Date.now() };
+        zombies: this.zombies.map(z => ({ x: z.x, y: z.y, hp: z.hp, h: z.horde ? 1 : 0, t: z.type })), lastHorde: this.lastHorde, weather: this.weather.live ? { k: this.weather.k, until: this.turn } : this.weather, snow: this.snow, startedAt: this.startedAt, spawned, looted, seen, msgs: this.msgs.slice(-10), saved: Date.now() };
     }
     static restore(place, data) {
       const g = new Game(place, data.seed);
       g.turn = data.turn; g.player = data.player; if (!g.player.ammo) g.player.ammo = {}; if (!g.player.hpMax) g.player.hpMax = 100; g.nextId = data.nextId || 1; g.msgs = data.msgs || [];
       for (const k of data.spawned) { const [cx, cy] = k.split(',').map(Number); g.world.getChunk(cx, cy).spawned = true; }
-      for (const z of data.zombies) { const zz = g.addZombie(z.x, z.y, null, z.hp); if (z.h) zz.horde = true; }
+      for (const z of data.zombies) { const zz = g.addZombie(z.x, z.y, null, z.hp, z.t || 'walker'); if (z.h) zz.horde = true; }
+      if (!g.player.stats) g.player.stats = { kills: {}, distance: 0, items: 0, searched: 0, shots: 0, doors: 0, windows: 0, hurt: 0, hordes: 0, nights: 0, eaten: 0, drunk: 0, healed: 0 };
+      if (!g.player.quests) g.player.quests = { done: {} };
       g.lastHorde = data.lastHorde || 0; if (data.weather) g.weather = Object.assign({ live: false }, data.weather); g.snow = data.snow || 0; g.startedAt = data.startedAt || Date.now();
       for (const [x, y, opened, items] of data.looted) { const c = g.world.containerAt(x, y) || g.world.carAt(x, y); if (c) { c.opened = !!opened; c.items = items; } }
       for (const [x, y, t, hp] of data.doors || []) g.setDoor(x, y, t, hp);
@@ -750,5 +820,6 @@
   global.Game = Game;
   global.ITEMS = ITEMS;
   global.CLASSES = CLASSES;
+  global.ZTYPES = ZTYPES;
   global.CONTAINER_NAME = CONTAINER_NAME;
 })(typeof window !== 'undefined' ? window : globalThis);
