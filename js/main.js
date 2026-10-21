@@ -229,6 +229,7 @@
   function showHelp() {
     mode = 'help';
     overlayBox.innerHTML = `<h2>What you need to know</h2>
+      <div class="section">Keyboard</div>
       <div class="keys">
         <div><kbd>←↑→↓</kbd> <kbd>numpad</kbd></div><div>Walk. Into them to hit. Into doors, windows, cars, shelves to open them.</div>
         <div><kbd>u</kbd></div><div>Use. Then a letter.</div>
@@ -243,8 +244,16 @@
         <div><kbd>S</kbd></div><div>Save.</div>
         <div><kbd>Esc</kbd></div><div>Leave. It saves.</div>
       </div>
-      <div class="muted" style="margin-top:10px">Red eyes have seen you. Noise carries. Doors hold a while. Below a quarter you stagger. Night takes what you cant see.</div>
-      <div class="muted" style="margin-top:6px">Any key.</div>`;
+      <div class="section" style="margin-top:12px">General</div>
+      <div class="keys">
+        <div>Them</div><div>Red eyes have seen you. Walkers, runners, brutes, spitters, howlers.</div>
+        <div>Noise</div><div>Hitting, shooting and glass carry. Hordes follow it.</div>
+        <div>Doors</div><div>Shut, they hold a while. Not forever.</div>
+        <div>Body</div><div>Food and water run it. Below a quarter you stagger.</div>
+        <div>Sight</div><div>Thirteen paces. Night takes the rest.</div>
+        <div>Time</div><div>Your clock. Your weather, when the net is on.</div>
+      </div>
+      <div class="muted" style="margin-top:10px">Any key.</div>`;
     overlay.classList.add('on');
   }
 
