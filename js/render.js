@@ -511,10 +511,11 @@
       const temp = game.live && typeof game.live.temp === 'number' ? ' · ' + Math.round(game.live.temp) + '°' : '';
       const timeStr = `Day ${game.day()} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${game.phase()} · ${game.weatherName()}${temp}`;
       let inv = '';
-      p.inv.forEach((id, i) => {
-        const it = ITEMS[id];
-        const wield = p.weapon === id && it.cat === 'weapon' ? ' <span class="muted">(wielded)</span>' : (it.ranged ? ` <span class="muted">(range ${it.range})</span>` : '');
-        inv += `<div class="item cat-${it.cat}"><span class="key">${String.fromCharCode(97 + i)}</span> ${it.name}${wield}</div>`;
+      game.invStacks().forEach((st, i) => {
+        const it = ITEMS[st.id];
+        const wield = p.weapon === st.id && it.cat === 'weapon' ? ' <span class="muted">(wielded)</span>' : (it.ranged ? ` <span class="muted">(range ${it.range})</span>` : '');
+        const count = st.n > 1 ? ` <span class="count">×${st.n}</span>` : '';
+        inv += `<div class="item cat-${it.cat}"><span class="key">${String.fromCharCode(97 + i)}</span> ${it.name}${count}${wield}</div>`;
       });
       if (!p.inv.length) inv = '<div class="muted">Nothing in it</div>';
       const msgs = game.msgs.slice(-9).map((m, i, a) => `<div class="${i === a.length - 1 ? 'latest' : ''}">${escapeHtml(m.s)}</div>`).join('');
@@ -534,6 +535,8 @@
         <div class="section">What happened</div>
         <div class="log">${msgs}</div>
         <div class="help muted">move: arrows / numpad · u use · g search beside you · q quests · x tally · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
+      // If the log has less room than its lines need, keep the newest lines in view and let the oldest clip.
+      const lg = this.sidebar.querySelector('.log'); if (lg) lg.scrollTop = lg.scrollHeight;
     }
 
     drawMap(game) {

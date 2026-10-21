@@ -229,18 +229,22 @@
   function showHelp() {
     mode = 'help';
     overlayBox.innerHTML = `<h2>What you need to know</h2>
-      <div><kbd>←↑→↓</kbd> or the numpad to walk. The numpad corners go diagonal. Walk into one of them to hit it.</div>
-      <div>Walk into a fridge, a shelf, a locker, a car, and you go through it. <kbd>g</kbd> goes through whatever is beside you.</div>
-      <div><kbd>u</kbd> and a letter uses a thing from the pack. Eat it, drink it, bind with it, take it up. <kbd>d</kbd> and a letter leaves it behind.</div>
-      <div>Doors start shut. Walk into one and it opens. <kbd>c</kbd> and a direction shuts it behind you. A shut door stops them and hides you, but one that knows you are in there will pound on it until it goes, and that takes a while and makes a noise. Walk into a window and the glass goes and you can climb through. What breaks stays broken.</div>
-      <div>The cars are still in the streets and piled up on the highways. The houses keep their roofs until you are inside.</div>
-      <div>Now and then they come in numbers. You will hear it first. They come straight on and they will take a door, a window, and in time a wall.</div>
-      <div><kbd>F</kbd> and a direction fires what is in your hands, in a line. The bow reaches 8 and is quiet. Shotgun 6. Pistol 10. Rifle 16. Guns carry. Rounds go in a pouch and dont take pack room.</div>
-      <div><kbd>q</kbd> is what there is to do. <kbd>x</kbd> is the tally of what you have done. They come in kinds now: walkers, runners that outpace you, howlers that call the rest, spitters that reach you from across the room, and brutes that go through walls.</div>
-      <div><kbd>.</kbd> or <kbd>space</kbd> waits. <kbd>m</kbd> is the map. <kbd>S</kbd> writes it down. <kbd>Esc</kbd> goes back to the title and writes it down on the way.</div>
-      <div class="muted" style="margin-top:10px">Red eyes means it has seen you. They see about ten paces by day and less at night. Hitting makes a noise. The clock on the wall is your clock: it is the same time in here as it is where you sit, and the sun goes down when yours does. The weather is whatever the weather is there, when the net is on. The food and the water run down. When they are gone the body goes next. When you are fed and watered it comes back, slowly. Under a quarter of it you stagger, and the lower it goes the less your steps are your own. You see thirteen paces. Past that you wont see what is there until you are on it. At night past that there is only the dark.</div>
-      <div class="muted">On the map. Gold is food. Red is medicine. Blue is tools. Purple is guns. Orange is gas.</div>
-      <div class="muted" style="margin-top:10px">Any key.</div>`;
+      <div class="keys">
+        <div><kbd>←↑→↓</kbd> <kbd>numpad</kbd></div><div>Walk. Into them to hit. Into doors, windows, cars, shelves to open them.</div>
+        <div><kbd>u</kbd></div><div>Use. Then a letter.</div>
+        <div><kbd>d</kbd></div><div>Drop. Then a letter.</div>
+        <div><kbd>g</kbd></div><div>Search beside you.</div>
+        <div><kbd>F</kbd></div><div>Fire. Then a direction.</div>
+        <div><kbd>c</kbd></div><div>Shut a door. Then a direction.</div>
+        <div><kbd>.</kbd> <kbd>space</kbd></div><div>Wait.</div>
+        <div><kbd>m</kbd></div><div>Map.</div>
+        <div><kbd>q</kbd></div><div>Quests.</div>
+        <div><kbd>x</kbd></div><div>Tally.</div>
+        <div><kbd>S</kbd></div><div>Save.</div>
+        <div><kbd>Esc</kbd></div><div>Leave. It saves.</div>
+      </div>
+      <div class="muted" style="margin-top:10px">Red eyes have seen you. Noise carries. Doors hold a while. Below a quarter you stagger. Night takes what you cant see.</div>
+      <div class="muted" style="margin-top:6px">Any key.</div>`;
     overlay.classList.add('on');
   }
 
@@ -294,12 +298,12 @@
     if (mode === 'map') { if (k === 'm' || k === 'Escape') { mode = 'play'; render(); } e.preventDefault(); return; }
     if (dropPending) {
       dropPending = false;
-      if (k.length === 1 && k >= 'a' && k <= 'p') game.act('drop', k.charCodeAt(0) - 97); else game.log('You keep it.');
+      if (k.length === 1 && k >= 'a' && k <= 'p') game.act('drop', game.slotForLetter(k.charCodeAt(0) - 97)); else game.log('You keep it.');
       render(); e.preventDefault(); return;
     }
     if (usePending) {
       usePending = false;
-      if (k.length === 1 && k >= 'a' && k <= 'p') game.act('use', k.charCodeAt(0) - 97); else game.log('You leave it where it is.');
+      if (k.length === 1 && k >= 'a' && k <= 'p') game.act('use', game.slotForLetter(k.charCodeAt(0) - 97)); else game.log('You leave it where it is.');
       render(); e.preventDefault(); return;
     }
     const mv = MOVE_KEYS[code] || MOVE_KEYS[k];

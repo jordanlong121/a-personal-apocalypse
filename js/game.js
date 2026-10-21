@@ -608,6 +608,22 @@
       return out;
     }
 
+    // Identical items show as one stack in the pack. Each stack gets one letter; the letter maps back to the
+    // first real slot holding that item, so use/drop always take one from the stack.
+    invStacks() {
+      const out = [], seen = new Map();
+      this.player.inv.forEach((id, idx) => {
+        const st = seen.get(id);
+        if (st) st.n++; else { const ns = { id, idx, n: 1 }; seen.set(id, ns); out.push(ns); }
+      });
+      return out;
+    }
+
+    slotForLetter(letterIdx) {
+      const st = this.invStacks()[letterIdx];
+      return st ? st.idx : -1;
+    }
+
     useItem(idx) {
       const id = this.player.inv[idx]; if (!id) return false;
       const it = ITEMS[id], p = this.player;
