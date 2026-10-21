@@ -130,17 +130,18 @@
       const pat = this.floorPattern(kind), P = pat.size;
       ctx.save();
       ctx.clip(p);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = pat; ctx.save(); ctx.translate(-((ox * ts) % P), -((oy * ts) % P)); ctx.fillRect(0, 0, W + P, H + P); ctx.restore();
-      if (game.snow > 0.05) { ctx.fillStyle = 'rgba(230,234,238,' + (0.12 * game.snow) + ')'; ctx.fillRect(0, 0, W, H); }
-      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
+      const shx = this.shx || 0, shy = this.shy || 0;
+      ctx.setTransform(1, 0, 0, 1, -shx, -shy);
+      ctx.fillStyle = pat; ctx.save(); ctx.translate(-((ox * ts) % P), -((oy * ts) % P)); ctx.fillRect(0, 0, W + P + ts, H + P + ts); ctx.restore();
+      if (game.snow > 0.05) { ctx.fillStyle = 'rgba(230,234,238,' + (0.12 * game.snow) + ')'; ctx.fillRect(0, 0, W + ts, H + ts); }
+      ctx.setTransform(ts, 0, 0, ts, -ox * ts - shx, -oy * ts - shy);
       // inner shadow along the outer wall
       ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2.6; ctx.stroke(p);
       ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.2; ctx.stroke(p);
       ctx.restore();
       // partition walls: merge runs of interior-wall tiles into bars
       const isW = (x, y) => world.buildingIdxAt(x, y) === i && world.tileAt(x, y) === T.IWALL;
-      ctx.save(); ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts); ctx.lineJoin = 'round';
+      ctx.save(); ctx.setTransform(ts, 0, 0, ts, -ox * ts - shx, -oy * ts - shy); ctx.lineJoin = 'round';
       const bar = (x, y, w, h) => { ctx.fillStyle = '#6e6257'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#3e352e'; ctx.lineWidth = 0.09; ctx.strokeRect(x, y, w, h); ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(x, y, w, Math.min(0.12, h)); };
       const th = 0.56, in0 = (1 - th) / 2;
       for (let r = -1; r <= rows; r++) for (let c = -1; c <= cols; c++) {
@@ -170,9 +171,16 @@
     draw(game, now) {
       now = now || performance.now();
       const ctx = this.ctx, ts = this.tile, W = this.canvas.width, H = this.canvas.height;
-      const cols = Math.ceil(W / ts) + 1, rows = Math.ceil(H / ts) + 1;
+      const cols = Math.ceil(W / ts) + 2, rows = Math.ceil(H / ts) + 2;
       const px = game.player.x, py = game.player.y;
-      const ox = px - Math.floor(cols / 2), oy = py - Math.floor(rows / 2);
+      // Smooth motion: entities slide from their previous tile over their move duration (real-time mode only).
+      const lerpPos = (e) => { if (!e.moveDur || e.px === undefined) return [e.x, e.y]; const t = Math.min(1, (Date.now() - e.moveT) / e.moveDur); return [e.px + (e.x - e.px) * t, e.py + (e.y - e.py) * t]; };
+      const [fx, fy] = lerpPos(game.player);
+      const ox = Math.floor(fx) - Math.floor(cols / 2), oy = Math.floor(fy) - Math.floor(rows / 2);
+      const shx = (fx - Math.floor(fx)) * ts, shy = (fy - Math.floor(fy)) * ts;
+      this.shx = shx; this.shy = shy;
+      const PX = () => ctx.setTransform(1, 0, 0, 1, -shx, -shy);                       // world pixels
+      const TX = () => ctx.setTransform(ts, 0, 0, ts, -ox * ts - shx, -oy * ts - shy);  // world tiles
       const world = game.world, place = game.place, SP = global.Sprites, hash2 = global.WorldUtil.hash2;
       const snow = game.snow, weather = game.weather.k;
       const inside = world.buildingIdxAt(px, py);
@@ -180,6 +188,7 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#07080a'; ctx.fillRect(0, 0, W, H);
       ctx.imageSmoothingEnabled = false;
+      PX();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
       const tileColor = (t) => {
@@ -202,7 +211,7 @@
       for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) for (const i of (world.index.get(cx + ',' + cy) || [])) feats.add(i);
       const list = [...feats];
       ctx.save();
-      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
+      TX();
       ctx.beginPath(); ctx.rect(0, 0, place.w, place.h); ctx.clip();
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       for (const i of list) {
@@ -233,7 +242,7 @@
       strokeAll(f => isStreet(f) && f.br, roadCol, f => f.w);
       if (snow < 0.5) strokeAll(f => isStreet(f) && f.w >= 6 && f.t !== 'service' && f.t !== 'living_street', f => f.w >= 8 ? '#b9a84a' : '#a09a7c', () => 0.22, [2.5, 2.5]);
       // Street names, laid along the road every so often, upright whichever way the road runs.
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      PX();
       ctx.font = 'bold ' + Math.max(9, Math.floor(ts * 0.5)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const labelSpacing = 42; // tiles between repeats of a name
       for (const [i, f] of roads) {
@@ -257,7 +266,7 @@
           ctx.restore();
         }
       }
-      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
+      TX();
       for (const i of list) {
         const f = place.feats[i]; if (f.k !== 'f') continue;
         ctx.strokeStyle = f.t === 'hedge' ? '#2f5a2a' : f.t === 'wall' ? '#6e6258' : '#7a5a35'; ctx.lineWidth = f.t === 'hedge' ? 0.8 : 0.3;
@@ -291,7 +300,7 @@
       const blds = list.filter(i => place.feats[i].k === 'b');
       const smokeSources = [];
       ctx.save();
-      ctx.setTransform(ts, 0, 0, ts, -ox * ts, -oy * ts);
+      TX();
       ctx.lineJoin = 'round';
       for (const i of blds) {
         const f = place.feats[i], lay = world.buildingLayout(i), p = this.path(game, i);
@@ -337,7 +346,7 @@
         ctx.strokeStyle = lay.burnt ? '#141210' : '#2b2420'; ctx.lineWidth = 0.35; ctx.stroke(p);
         if (lay.burning) smokeSources.push([mx, my, bw]);
         // Rooftop detail and landmarks (drawn in pixel space).
-        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.save(); PX();
         const sx = (mx - ox) * ts, sy = (my - oy) * ts;
         if (f.rf === 'flat' && lay.floorCount > 150 && !lay.burnt) {
           const n = Math.min(4, 1 + Math.floor(lay.floorCount / 400));
@@ -367,7 +376,7 @@
         ctx.restore();
       }
       // Doors and windows, rotated to lie along the wall they are set in, facing outward.
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      PX();
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const x = ox + c, y = oy + r, t = world.tileAt(x, y);
         if (!SPRITE_TILES[t] || t === T.WALL_BROKEN) continue;
@@ -395,16 +404,16 @@
         }
       }
       for (const z of game.zombies) {
-        const c = z.x - ox, r = z.y - oy;
-        if (c < 0 || r < 0 || c >= cols || r >= rows || !game.visible(z.x, z.y)) continue;
+        if (z.x - ox < -1 || z.y - oy < -1 || z.x - ox > cols || z.y - oy > rows || !game.visible(z.x, z.y)) continue;
+        const [zx, zy] = lerpPos(z);
         const base = z.type === 'brute' ? (z.alert ? 'brute_alert' : 'brute') : (z.alert ? 'zombie_alert' : 'zombie') + (z.type && z.type !== 'walker' && z.type !== 'brute' ? '|' + z.type : '');
-        SP.draw(ctx, base, c * ts, r * ts, ts);
+        SP.draw(ctx, base, (zx - ox) * ts, (zy - oy) * ts, ts);
       }
-      ctx.drawImage(SP.avatar(game.player.avatar), (px - ox) * ts, (py - oy) * ts, ts, ts);
+      ctx.drawImage(SP.avatar(game.player.avatar), (fx - ox) * ts, (fy - oy) * ts, ts, ts);
 
       // 8. Shot tracer.
       const shot = game.lastShot;
-      if (shot && shot.turn === game.turn) {
+      if (shot && (game.realtime ? Date.now() - (shot.time || 0) < 220 : shot.turn === game.turn)) {
         ctx.strokeStyle = shot.hit ? '#ffd166' : '#d8d2b8'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo((shot.x0 - ox) * ts + ts / 2, (shot.y0 - oy) * ts + ts / 2); ctx.lineTo((shot.x1 - ox) * ts + ts / 2, (shot.y1 - oy) * ts + ts / 2); ctx.stroke();
       }
@@ -425,7 +434,8 @@
         }
       }
 
-      // 10. Weather.
+      // 10. Weather and everything after it are drawn in screen space.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       if (weather === 'rain') {
         ctx.strokeStyle = 'rgba(180,200,230,0.35)'; ctx.lineWidth = 1; ctx.beginPath();
         const n = 260, t = now / 1000;
@@ -488,9 +498,14 @@
         const mctx = this.mask.getContext('2d'), mimg = mctx.createImageData(cols, rows), a = Math.round(140 * nightness);
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const i = (r * cols + c) * 4; mimg.data[i] = 5; mimg.data[i + 1] = 6; mimg.data[i + 2] = 14; mimg.data[i + 3] = game.visible(ox + c, oy + r) ? 0 : a; }
         mctx.putImageData(mimg, 0, 0);
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = true; PX();
         ctx.drawImage(this.mask, 0, 0, cols, rows, -ts / 2, -ts / 2, cols * ts, rows * ts);
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = false; ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      if (game.realtime && game.paused) {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#e8dcc2'; ctx.font = 'bold 28px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Stopped.', W / 2, H / 2 - 10);
+        ctx.font = '14px sans-serif'; ctx.fillStyle = '#a9a496'; ctx.fillText('p to go on', W / 2, H / 2 + 20);
       }
 
       if (!world.inData(px, py)) { ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('Past the edge of the map. The country out here is made up.', 12, H - 14); }
@@ -499,6 +514,11 @@
 
     drawSidebar(game) {
       const p = game.player, w = game.weapon(), SP = global.Sprites;
+      const q0 = game.currentQuest();
+      const sig = [p.hp, p.hunger, p.thirst, p.inv.join(), p.weapon, JSON.stringify(p.ammo), game.msgs.length, Math.floor(game.hour() * 60), game.weather.k, game.snow > 0.05, p.kills,
+        q0 ? q0.id + q0.cur : '', p.x, p.y, game.live && game.live.temp, game.day(), game.realtime, game.paused].join('|');
+      if (sig === this.lastSig) return;
+      this.lastSig = sig;
       const bar = (v, color) => `<div class="bar"><div style="width:${v}%;background:${color}"></div></div>`;
       const b = game.world.buildingAt(p.x, p.y);
       let where = 'Out in the open';
@@ -521,7 +541,7 @@
       const msgs = game.msgs.slice(-9).map((m, i, a) => `<div class="${i === a.length - 1 ? 'latest' : ''}">${escapeHtml(m.s)}</div>`).join('');
       this.sidebar.innerHTML = `
         <div class="place">${escapeHtml(game.place.name.split(',').slice(0, 2).join(','))}</div>
-        <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr}</div>
+        <div class="time"><img class="avatar" src="${SP.avatarDataUrl(game.player.avatar)}" alt=""> ${escapeHtml(game.className())} · ${timeStr}${game.realtime ? ' · <span class="muted">real time</span>' : ''}</div>
         <div class="where">${escapeHtml(where)}</div>
         ${(() => { const q = game.currentQuest(); return q ? `<div class="quest">${escapeHtml(q.title)} <span class="muted">${q.max > 1 ? q.cur + '/' + q.max : ''} · q for all</span></div>` : '<div class="quest muted">Nothing left to do but live.</div>'; })()}
         <div class="stat"><span>Body</span>${bar(100 * p.hp / (p.hpMax || 100), p.hp > 40 ? '#5fbf6a' : '#d44')}<span class="num">${p.hp}</span></div>
@@ -534,7 +554,7 @@
         <div class="inv">${inv}</div>
         <div class="section">What happened</div>
         <div class="log">${msgs}</div>
-        <div class="help muted">move: arrows / numpad · u use · g search beside you · q quests · x tally · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
+        <div class="help muted">move: arrows / numpad · u use · g search beside you · q quests · x tally · p stop · r pace · F+dir fire · c+dir shut door · . wait · d drop · m map · S save · ? help</div>`;
       // If the log has less room than its lines need, keep the newest lines in view and let the oldest clip.
       const lg = this.sidebar.querySelector('.log'); if (lg) lg.scrollTop = lg.scrollHeight;
     }

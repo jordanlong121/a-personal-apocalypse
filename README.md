@@ -23,6 +23,10 @@ then open http://localhost:8000/.
 
 ## Play
 
+Two paces, chosen on the title screen or with `r` in game: real time (the default: 8 ticks a second, hold a key to walk,
+zombies move on their own cooldowns, `p` stops the clock) or turn by turn (nothing moves until you do). Sprites slide
+between tiles in real time; the grid underneath is unchanged.
+
 A new game starts with a class pick: Soldier, Police Officer, Doctor, Engineer, Firefighter, Hunter or Chef.
 Each has a starting kit and a perk (see `CLASSES` in `js/game.js`). Then you choose a look: fourteen presets across
 skin tones, hair, beards and headwear, or mix your own; the outfit follows the class (see `Sprites.avatar`).

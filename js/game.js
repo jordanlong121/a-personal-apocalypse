@@ -5,6 +5,9 @@
   const T = global.T, CH = global.CH;
 
   const TURN_SECONDS = 6;           // one step ≈ one cautious metre (hunger, thirst and weather still run per turn)
+  const TICK_MS = 125;              // real-time mode: 8 ticks a second; a world turn is every TICKS_PER_TURN ticks
+  const TICKS_PER_TURN = 6;
+  const PLAYER_CD = { move: 2, attack: 3, fire: 4, grab: 1, use: 2, drop: 1, close: 2, wait: 1 };
   const START_HOUR = 8;             // unused now that the clock follows the real local time
   const INV_MAX = 16;
 
@@ -134,6 +137,7 @@
       this.weather = { k: 'clear', until: 0, live: false };
       this.snow = 0;
       this.startedAt = Date.now();
+      this.realtime = false; this.paused = false; this.tickNo = 0; this.cdUntil = 0; this.lastWasAttack = false;
       this.live = null; // last live weather reading, if any
       this.sunCache = null;
       this.fov = { r: 0, x: 0, y: 0, data: null };
@@ -304,7 +308,7 @@
     viewRadius() { return 13; } // same sight range day and night; unexplored areas are still revealed only within it
     zombieAt(x, y) { return this.zmap.get(x + ',' + y) || null; }
 
-    moveZombie(z, x, y) { this.zmap.delete(z.x + ',' + z.y); z.x = x; z.y = y; this.zmap.set(x + ',' + y, z); }
+    moveZombie(z, x, y) { this.zmap.delete(z.x + ',' + z.y); z.px = z.x; z.py = z.y; z.moveT = Date.now(); z.moveDur = this.realtime ? (z.cdTicks || TICKS_PER_TURN) * TICK_MS : 0; z.x = x; z.y = y; this.zmap.set(x + ',' + y, z); }
 
     los(x0, y0, x1, y1) {
       // Bresenham; returns true if no opaque tile strictly between the endpoints.
@@ -474,6 +478,9 @@
     // Each returns true if a turn was consumed.
     act(cmd, arg) {
       if (this.dead) return false;
+      if (this.realtime && (this.paused || this.tickNo < this.cdUntil)) return false;
+      if (this.realtime && cmd === 'wait') return false; // time passes on its own
+      this.lastWasAttack = false;
       let took = false;
       switch (cmd) {
         case 'move': took = this.tryMove(arg[0], arg[1]); break;
@@ -484,7 +491,10 @@
         case 'fire': took = this.fire(arg[0], arg[1]); break;
         case 'close': took = this.closeDoor(arg[0], arg[1]); break;
       }
-      if (took) this.endTurn();
+      if (took) {
+        if (this.realtime) { this.cdUntil = this.tickNo + (this.lastWasAttack ? PLAYER_CD.attack : (PLAYER_CD[cmd] || 1)); this.computeFov(); }
+        else this.endTurn();
+      }
       if (this.onChange) this.onChange();
       return took;
     }
@@ -514,11 +524,13 @@
         if (t === T.WATER) this.log('Black water. You dont go in.');
         return false;
       }
+      this.player.px = this.player.x; this.player.py = this.player.y; this.player.moveT = Date.now(); this.player.moveDur = this.realtime ? PLAYER_CD.move * TICK_MS : 0;
       this.player.x = x; this.player.y = y; this.player.stats.distance++;
       return true;
     }
 
     attack(z) {
+      this.lastWasAttack = true;
       let w = this.weapon();
       if (w.ranged) w = { name: 'butt of your ' + w.name.toLowerCase(), dmg: w.melee, hit: 0.75 };
       this.noise(this.player.x, this.player.y, 7);
@@ -546,7 +558,7 @@
         const z = this.zombieAt(x, y);
         if (z) { target = z; break; }
       }
-      this.lastShot = { x0: this.player.x, y0: this.player.y, x1: x, y1: y, turn: this.turn + 1, hit: !!target };
+      this.lastShot = { x0: this.player.x, y0: this.player.y, x1: x, y1: y, turn: this.turn + 1, time: Date.now(), hit: !!target };
       this.noise(this.player.x, this.player.y, Math.max(2, w.noise - this.perk('noiseDamp', 0)));
       if (!target) { this.log('The shot goes out across the lots. Nothing.'); return true; }
       const hitChance = Math.min(0.97, Math.max(0.3, w.hit + this.perk('ranged', 0) - (w.falloff || 0.025) * dist));
@@ -672,6 +684,30 @@
     // ---- turn resolution -----------------------------------------------------
     endTurn() {
       this.turn++;
+      this.turnSystems();
+      this.zombiesAct();
+      this.computeFov();
+      this.turnEnd();
+    }
+    // Real time: one tick. The world turn advances every TICKS_PER_TURN ticks; each zombie acts on its own cooldown.
+    tick() {
+      if (this.dead || this.paused) return;
+      this.tickNo++;
+      if (this.tickNo % TICKS_PER_TURN === 0) { this.turn++; this.turnSystems(); this.computeFov(); this.turnEnd(); if (this.dead) return; }
+      const p = this.player;
+      for (const z of this.zombies.slice()) {
+        if (Math.abs(z.x - p.x) > 40 || Math.abs(z.y - p.y) > 40) continue;
+        const zt = this.ztype(z);
+        z.cdTicks = Math.max(1, Math.round(TICKS_PER_TURN / zt.speed));
+        if (z.nextAct === undefined) z.nextAct = this.tickNo + Math.floor(this.rng() * z.cdTicks);
+        if (this.tickNo < z.nextAct) continue;
+        z.nextAct = this.tickNo + z.cdTicks;
+        if (this.zombies.includes(z)) this.zombieStep(z, zt, 0);
+        if (this.dead) break;
+      }
+      if (p.hp <= 0 && !this.dead) { p.hp = 0; this.dead = true; this.log('Then nothing.'); }
+    }
+    turnSystems() {
       const p = this.player;
       if (this.turn % 90 === 0) p.hunger = Math.max(0, p.hunger - 1);
       if (this.turn % 55 === 0) p.thirst = Math.max(0, p.thirst - 1);
@@ -683,8 +719,9 @@
       this.updateWeather();
       this.ensureSpawns();
       this.maybeSpawnHorde();
-      this.zombiesAct();
-      this.computeFov();
+    }
+    turnEnd() {
+      const p = this.player;
       const ph = this.phase();
       if (this.lastPhase === 'night' && ph === 'dawn' && p.hp > 0) { p.stats.nights++; this.log('Light. You are still here.'); }
       this.lastPhase = ph;

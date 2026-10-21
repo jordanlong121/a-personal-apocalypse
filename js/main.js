@@ -95,6 +95,7 @@
     renderer.resize(); renderer.mapCanvas = null; renderer.paths = new Map(); renderer.wallAngles = new Map();
     if (save) {
       game = Game.restore(place, save);
+      game.realtime = pace === 'realtime';
       game.onChange = () => { if (mode === 'play') render(); };
       window.__game = game; // for automation/debugging
       mode = 'play'; render();
@@ -103,6 +104,7 @@
       return;
     }
     game = new Game(place, (Math.random() * 0xffffffff) >>> 0);
+    game.realtime = pace === 'realtime';
     game.onChange = () => { if (mode === 'play') render(); };
     window.__game = game;
     showClassPicker();
@@ -182,15 +184,38 @@
     if (mode === 'map') renderer.drawMap(game); else renderer.draw(game);
     if (game.dead && mode !== 'dead') showDeath();
   }
+  // Pace: turn by turn (the world moves when you do) or real time (it moves anyway, 8 ticks a second).
+  let pace = 'realtime';
+  try { pace = localStorage.getItem('zr_pace') || 'realtime'; } catch (e) { /* ignore */ }
+  function setPace(p) { pace = p; try { localStorage.setItem('zr_pace', p); } catch (e) { /* ignore */ } if ($('pace')) $('pace').value = p; if (game) { game.realtime = p === 'realtime'; game.paused = false; render(); } }
+
+  // Held movement keys drive real-time walking; a tap still steps once in either mode.
+  const held = new Set();
+  function heldDir() {
+    let dx = 0, dy = 0;
+    for (const k of held) { const d = MOVE_KEYS[k]; if (d) { if (d[0] && d[1]) return d; dx += d[0]; dy += d[1]; } }
+    return (dx || dy) ? [Math.sign(dx), Math.sign(dy)] : null;
+  }
+  document.addEventListener('keyup', e => { held.delete(e.code); held.delete(e.key); });
+  window.addEventListener('blur', () => held.clear());
+
+  setInterval(() => {
+    if (!game || mode !== 'play' || !game.realtime || game.paused) return;
+    const d = heldDir();
+    if (d && !dropPending && !usePending && !firePending && !closePending) game.act('move', d);
+    game.tick();
+    if (game.dead && mode !== 'dead') showDeath();
+  }, 125);
+
   // Weather and smoke animate; redraw at a modest rate only while something is moving. The clock is real time,
-  // so also redraw when the minute changes and the light moves on without you.
+  // so also redraw when the minute changes and the light moves on without you. Real-time pace draws every frame.
   let lastMinute = -1;
   (function animate() {
     if (game && mode === 'play' && renderer) {
       const m = Math.floor(game.hour() * 60);
-      if (renderer.animated || m !== lastMinute) { lastMinute = m; renderer.draw(game); }
+      if (game.realtime || renderer.animated || m !== lastMinute) { lastMinute = m; renderer.draw(game); }
     }
-    setTimeout(animate, 70);
+    if (game && game.realtime && mode === 'play') requestAnimationFrame(animate); else setTimeout(animate, 70);
   })();
 
   // Live weather for the town from Open-Meteo (free, no key). Refreshed every ten minutes while you play.
@@ -242,6 +267,8 @@
         <div><kbd>q</kbd></div><div>Quests.</div>
         <div><kbd>x</kbd></div><div>Tally.</div>
         <div><kbd>S</kbd></div><div>Save.</div>
+        <div><kbd>p</kbd></div><div>Stop. In real time.</div>
+        <div><kbd>r</kbd></div><div>Pace. Real time or turn by turn.</div>
         <div><kbd>Esc</kbd></div><div>Leave. It saves.</div>
       </div>
       <div class="section" style="margin-top:12px">General</div>
@@ -252,6 +279,7 @@
         <div>Body</div><div>Food and water run it. Below a quarter you stagger.</div>
         <div>Sight</div><div>Thirteen paces. Night takes the rest.</div>
         <div>Time</div><div>Your clock. Your weather, when the net is on.</div>
+        <div>Pace</div><div>Real time: hold a key to walk, they keep coming. Turns: nothing moves until you do.</div>
       </div>
       <div class="muted" style="margin-top:10px">Any key.</div>`;
     overlay.classList.add('on');
@@ -316,6 +344,10 @@
       render(); e.preventDefault(); return;
     }
     const mv = MOVE_KEYS[code] || MOVE_KEYS[k];
+    if (mv && !e.repeat) held.add(MOVE_KEYS[code] ? code : k);
+    if (mv && e.repeat && game.realtime) { e.preventDefault(); return; } // held keys are handled by the tick loop
+    if (k === 'p' && game.realtime) { game.paused = !game.paused; render(); e.preventDefault(); return; }
+    if (k === 'r') { setPace(game.realtime ? 'turns' : 'realtime'); game.log(game.realtime ? 'Time moves on its own now.' : 'Time waits for you now.'); render(); e.preventDefault(); return; }
     if (firePending) {
       firePending = false;
       if (mv) game.act('fire', mv); else { game.log('You lower it.'); render(); }
@@ -366,6 +398,7 @@
   canvas.tabIndex = 0; canvas.style.outline = 'none';
   function focusGame() { try { canvas.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   $('go').onclick = download;
+  $('pace').value = pace; $('pace').onchange = () => setPace($('pace').value);
   $('q').addEventListener('keydown', e => { if (e.key === 'Enter') download(); });
   window.addEventListener('resize', () => { if (renderer) { renderer.resize(); renderer.mapCanvas = null; renderer.paths = new Map(); renderer.wallAngles = new Map(); render(); } });
   window.addEventListener('beforeunload', () => { if (game && !game.dead && mode !== 'class' && mode !== 'avatar') Store.putSave(game.place.id, game.serialize()); });
